@@ -90,7 +90,10 @@ fn open_home(app: &AppHandle, tab: &str) -> Result<(), String> {
 
 pub fn open_editor_window(app: &AppHandle, path: &str) {
     let label = windows::next_label("editor");
-    let _ = windows::normal(app, &label, &format!("/editor?p={}", enc(path)), "NeatShotX — Annotate", 1200.0, 800.0);
+    if let Ok(w) = windows::normal(app, &label, &format!("/editor?p={}", enc(path)), "NeatShotX — Annotate", 1240.0, 800.0) {
+        // The CleanShot-style top bar doesn't collapse; keep it from overflowing.
+        let _ = w.set_min_size(Some(tauri::LogicalSize::new(1180.0, 560.0)));
+    }
 }
 
 pub fn open_pin_window(app: &AppHandle, path: &str) {

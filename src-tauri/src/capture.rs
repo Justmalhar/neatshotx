@@ -376,6 +376,11 @@ pub async fn delete_capture(app: AppHandle, path: String) -> Result<(), String> 
     if !p.starts_with(history_dir(&app)) {
         return Err("Refusing to delete outside history".into());
     }
+    // Also remove the auto-saved copy in the export folder (Quick Access "trash").
+    let save_dir = settings::get(&app).save_dir;
+    if let (false, Some(name)) = (save_dir.is_empty(), p.file_name()) {
+        let _ = std::fs::remove_file(PathBuf::from(save_dir).join(name));
+    }
     std::fs::remove_file(p).map_err(|e| e.to_string())
 }
 

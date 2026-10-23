@@ -2,7 +2,7 @@ import { useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Copy, Download, Film, Pencil, Pin, Play, UploadCloud, X } from "lucide-react";
+import { Check, CloudUpload, Pencil, Pin, Play, Trash2, X } from "lucide-react";
 import { api, fileName, fileSrc, isGif, isVideo } from "../../lib/api";
 import { spring, materialize } from "../../lib/motion";
 import { useAutoClose } from "./useAutoClose";
@@ -17,11 +17,13 @@ type Props = {
   autoCloseSecs: number;
   closeAfterDrag: boolean;
   closeAfterUpload: boolean;
+  /** Saved automatically after capture → offer Delete instead of Save (CleanShot behavior). */
+  autoSaved: boolean;
   onClose: () => void;
   onReplace: (p: string) => void;
 };
 
-export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, closeAfterUpload, onClose, onReplace }: Props) {
+export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, closeAfterUpload, autoSaved, onClose, onReplace }: Props) {
   const [toast, setToast] = useState<{ text: string; err?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [hover, setHover] = useState(false);
@@ -64,26 +66,28 @@ export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, c
         </div>
       )}
 
-      <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/50 via-black/20 to-black/50 p-2 opacity-0 backdrop-blur-[3px] transition-opacity duration-150 group-hover:opacity-100">
-        <div className="flex justify-between">
-          <IconBtn title="Close" onClick={onClose}>
-            {autoCloseSecs > 0 && (
-              <svg viewBox="0 0 28 28" className="pointer-events-none absolute inset-0 -rotate-90">
-                <motion.circle cx="14" cy="14" r="12.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ pathLength: progress, opacity: 0.55 }} />
-              </svg>
-            )}
-            <X size={14} />
-          </IconBtn>
-          <div className="flex gap-1">
-            {image && <IconBtn title="Pin" onClick={() => api.openPin(path)}><Pin size={14} /></IconBtn>}
-            {image && <IconBtn title="Annotate" onClick={() => { api.openEditor(path); onClose(); }}><Pencil size={14} /></IconBtn>}
-            <IconBtn title="Upload & copy link" onClick={() => run(() => api.upload(path), "Link copied", closeAfterUpload ? () => setTimeout(onClose, 900) : undefined)}><UploadCloud size={14} /></IconBtn>
-          </div>
-        </div>
-        <div className="flex justify-center gap-1.5">
-          {image && <PillBtn onClick={() => run(() => api.copyImage(path), "Copied")}><Copy size={13} />Copy</PillBtn>}
-          {video && <PillBtn onClick={() => run(async () => onReplace(await api.convertToGif(path)), "GIF ready")}><Film size={13} />GIF</PillBtn>}
-          <PillBtn onClick={saveAs}><Download size={13} />Save</PillBtn>
+      {/* CleanShot layout: corner actions + centered Copy / Save-or-Delete capsules over a dark scrim. */}
+      <div className="absolute inset-0 bg-[rgba(18,18,20,0.58)] opacity-0 backdrop-blur-[2px] transition-opacity duration-150 group-hover:opacity-100">
+        <IconBtn title="Close" className="left-2 top-2" onClick={onClose}>
+          {autoCloseSecs > 0 && (
+            <svg viewBox="0 0 30 30" className="pointer-events-none absolute inset-0 -rotate-90">
+              <motion.circle cx="15" cy="15" r="13.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ pathLength: progress, opacity: 0.5 }} />
+            </svg>
+          )}
+          <X size={15} strokeWidth={2.6} />
+        </IconBtn>
+        {image && <IconBtn title="Pin to the screen" className="right-2 top-2" onClick={() => api.openPin(path)}><Pin size={14} strokeWidth={2.4} fill="currentColor" /></IconBtn>}
+        {image && <IconBtn title="Annotate" className="bottom-2 left-2" onClick={() => { api.openEditor(path); onClose(); }}><Pencil size={14} strokeWidth={2.4} fill="currentColor" /></IconBtn>}
+        <IconBtn title="Upload & copy link" className="bottom-2 right-2"
+          onClick={() => run(() => api.upload(path), "Link copied", closeAfterUpload ? () => setTimeout(onClose, 900) : undefined)}>
+          <CloudUpload size={15} strokeWidth={2.4} />
+        </IconBtn>
+        <div className="absolute inset-0 m-auto flex h-fit w-fit flex-col items-center gap-2">
+          {image && <PillBtn onClick={() => run(() => api.copyImage(path), "Copied")}>Copy</PillBtn>}
+          {video && <PillBtn onClick={() => run(async () => onReplace(await api.convertToGif(path)), "GIF ready")}>GIF</PillBtn>}
+          {autoSaved
+            ? <PillBtn title="Delete" onClick={() => run(() => api.deleteCapture(path), "Deleted", onClose)}><Trash2 size={17} strokeWidth={2.2} /></PillBtn>
+            : <PillBtn onClick={saveAs}>Save</PillBtn>}
         </div>
       </div>
 
@@ -99,12 +103,13 @@ export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, c
   );
 }
 
-const pill = "mat-hud relative grid place-items-center text-white";
+type Btn = React.ButtonHTMLAttributes<HTMLButtonElement>;
+const light = "grid place-items-center bg-[rgba(232,232,237,0.94)] text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.3)] hover:bg-white";
 
-function IconBtn(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <motion.button whileTap={{ scale: 0.9 }} transition={spring.press} {...(props as object)} className={`${pill} h-7 w-7 rounded-full`} />;
+function IconBtn({ className = "", ...props }: Btn) {
+  return <motion.button whileTap={{ scale: 0.88 }} transition={spring.press} {...(props as object)} className={`${light} absolute h-[30px] w-[30px] rounded-full ${className}`} />;
 }
 
-function PillBtn(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <motion.button whileTap={{ scale: 0.94 }} transition={spring.press} {...(props as object)} className={`${pill} h-7 grid-flow-col gap-1.5 rounded-full px-3 text-xs font-medium`} />;
+function PillBtn(props: Btn) {
+  return <motion.button whileTap={{ scale: 0.94 }} transition={spring.press} {...(props as object)} className={`${light} h-9 min-w-[84px] rounded-full px-4 text-[15px] font-semibold`} />;
 }

@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Konva from "konva";
-import { Group, Image as KImage, Layer, Rect, Shape as KShape, Stage, Transformer } from "react-konva";
+import { Group, Image as KImage, Layer, Shape as KShape, Stage, Transformer } from "react-konva";
 import { save } from "@tauri-apps/plugin-dialog";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, fileName, param } from "../lib/api";
 import { materialize, spring } from "../lib/motion";
 import ShapeNode from "../components/editor/ShapeNode";
 import BackgroundPanel from "../components/editor/BackgroundPanel";
+import { Backdrop, groupClip } from "../components/editor/background/Backdrop";
+import { layoutBackground } from "../components/editor/background/layout";
+import BottomBar from "../components/editor/BottomBar";
 import LineHandles from "../components/editor/LineHandles";
 import TopBar from "../components/editor/TopBar";
 import Toast from "../components/editor/Toast";
@@ -14,7 +19,7 @@ import type { StylePatch, StyleValues } from "../components/editor/StyleBar";
 import { useZoom } from "../components/editor/useZoom";
 import { useEditorKeys } from "../components/editor/useEditorKeys";
 import { FONT, contrast, fontOf, measure, pill } from "../components/editor/text";
-import { ASPECTS, GRADIENTS, norm, type Background, type Shape, type Tool } from "../components/editor/types";
+import { DEFAULT_BACKGROUND, norm, type Background, type Shape, type Tool } from "../components/editor/types";
 
 type Doc = { base: string; shapes: Shape[] };
 const uid = () => Math.random().toString(36).slice(2);
@@ -47,7 +52,8 @@ export default function Editor() {
   const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
-  const [bg, setBg] = useState<Background>({ enabled: false, padding: 64, gradient: 0, radius: 12, shadow: true, mode: "gradient", color: "#f5f5f4", aspect: "auto" });
+  const [bg, setBg] = useState<Background>(DEFAULT_BACKGROUND);
+  const [showBg, setShowBg] = useState(false);
   const [view, setView] = useState({ w: 800, h: 600 });
   const [toast, setToast] = useState<string | null>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -69,15 +75,12 @@ export default function Editor() {
     return () => ro.disconnect();
   }, []);
 
-  // Canvas geometry (image px): background padding, then optional aspect padding, image centered.
+  // Canvas geometry (image px) comes from the background layout: padding, ratio, alignment.
   const iw = img?.width ?? 1, ih = img?.height ?? 1;
   const unit = Math.max(1, iw / 1400);
-  const pad = bg.enabled ? bg.padding * unit : 0;
-  const bw = iw + pad * 2, bh = ih + pad * 2;
-  const ratio = bg.enabled ? ASPECTS[bg.aspect] : 0;
-  const W = ratio && bw / bh < ratio ? bh * ratio : bw;
-  const H = ratio && bw / bh >= ratio ? bw / ratio : bh;
-  const ox = (W - iw) / 2, oy = (H - ih) / 2;
+  const layout = useMemo(() => layoutBackground(bg, iw, ih), [bg, iw, ih]);
+  const { W, H } = layout;
+  const ox = layout.image.x, oy = layout.image.y;
   const zoom = useZoom(view, W, H, scrollRef);
   const scale = zoom.scale;
 
@@ -177,8 +180,8 @@ export default function Editor() {
     const hide = [overlayRef.current!, ...st.find(".ui")].filter((n) => n.visible());
     hide.forEach((n) => n.hide());
     try {
-      const r = region ?? { x: -ox, y: -oy, w: W, h: H };
-      return st.toDataURL({ x: (r.x + ox) * scale, y: (r.y + oy) * scale, width: r.w * scale, height: r.h * scale, pixelRatio: 1 / scale });
+      const r = region ?? { x: 0, y: 0, w: W, h: H }; // canvas coords
+      return st.toDataURL({ x: r.x * scale, y: r.y * scale, width: r.w * scale, height: r.h * scale, pixelRatio: 1 / scale });
     } finally {
       hide.forEach((n) => n.show());
     }
@@ -189,7 +192,7 @@ export default function Editor() {
     const c = norm({ ...crop, id: "", kind: "rect", color: "", size: 0 });
     setCrop(null);
     if (c.w < 4 || c.h < 4) return;
-    const data = exportPng({ x: c.x, y: c.y, w: c.w, h: c.h });
+    const data = exportPng({ x: c.x + ox, y: c.y + oy, w: c.w, h: c.h });
     commit({ base: await (await fetch(data)).blob().then((b) => URL.createObjectURL(b)), shapes: [] });
     setTool("select");
   };
@@ -208,6 +211,12 @@ export default function Editor() {
   };
   const doPin = () => act(async () => api.openPin(await api.writePng(exportPng())), "Pinned");
   const doUpload = () => act(async () => api.upload(await api.writePng(exportPng(), path)), "Link copied");
+  const doReveal = () => act(async () => revealItemInDir(await api.writePng(exportPng(), path)), "Shown in Finder");
+  const doDone = async () => {
+    try { await api.writePng(exportPng(), path); await getCurrentWindow().close(); } catch (e) { flash(String(e)); }
+  };
+  /** Quick canvas: white frame around the screenshot (Background panel has the full controls). */
+  const addCanvas = () => setBg((b) => (b.kind === "none" ? { ...b, kind: "color", color: "#ffffff", padding: 40 } : b));
 
   const remove = () => { setShapes(doc.shapes.filter((s) => s.id !== selected)); setSelected(null); };
   const duplicate = () => {
@@ -224,12 +233,12 @@ export default function Editor() {
 
   useEditorKeys({
     editing: !!editing, hasCrop: !!crop, hasSelection: !!selected && tool === "select",
-    undo, redo, copy: doCopy, save: doSave, saveAs: doSaveAs, remove, duplicate, nudge, applyCrop,
+    undo, redo, copy: doCopy, save: doSave, saveAs: doSaveAs, done: doDone, remove, duplicate, nudge, applyCrop,
     escape: () => { setCrop(null); setSelected(null); },
     setTool, zoomIn: zoom.zoomIn, zoomOut: zoom.zoomOut, zoomFit: zoom.fit, zoomActual: zoom.actual,
   });
 
-  useEffect(() => { if (tool === "crop") setBg((b) => ({ ...b, enabled: false })); if (tool !== "select") setSelected(null); }, [tool]);
+  useEffect(() => { if (tool === "crop") setBg((b) => ({ ...b, kind: "none" })); if (tool !== "select") setSelected(null); }, [tool]);
 
   // Style bar edits the selected object when there is one, and always updates the defaults for new objects.
   const shown: StyleValues = sel
@@ -253,7 +262,6 @@ export default function Editor() {
   }, [all, style.counterStart]);
   const spots = all.filter((s) => s.kind === "spotlight").map(norm);
   const editingShape = doc.shapes.find((s) => s.id === editing);
-  const [g0, g1] = GRADIENTS[bg.gradient];
 
   const finishEdit = (raw: string) => {
     const text = raw.trim();
@@ -274,34 +282,30 @@ export default function Editor() {
   })();
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex h-full flex-col">
-      <TopBar name={fileName(path)} dims={`${Math.round(W)} × ${Math.round(H)}`}
-        tool={tool} setTool={setTool} styleKind={sel ? sel.kind : tool} style={shown} onStyle={onStyle} zoom={zoom}
-        canUndo={past.length > 0} canRedo={future.length > 0} canRevert={doc.base !== original || doc.shapes.length > 0}
-        bgOn={bg.enabled} undo={undo} redo={redo} revert={revert} toggleBg={() => setBg({ ...bg, enabled: !bg.enabled })}
-        pin={doPin} upload={doUpload} saveAs={doSaveAs} save={doSave} copy={doCopy} />
+      <TopBar tool={tool} setTool={setTool} styleKind={sel ? sel.kind : tool} style={shown} onStyle={onStyle}
+        showBg={showBg} toggleBg={() => setShowBg((v) => !v)} addCanvas={addCanvas} saveAs={doSaveAs} done={doDone} />
 
       <div className="flex min-h-0 flex-1">
-        <div className="relative min-w-0 flex-1">
+        <AnimatePresence initial={false}>
+          {showBg && img && (
+            <motion.aside key="bg" initial={{ x: -24, opacity: 0, width: 0 }} animate={{ x: 0, opacity: 1, width: 300 }}
+              exit={{ x: -24, opacity: 0, width: 0 }} transition={spring.move} className="shrink-0 overflow-hidden">
+              <BackgroundPanel bg={bg} setBg={setBg} img={img} />
+            </motion.aside>
+          )}
+        </AnimatePresence>
+        <div className="relative min-w-0 flex-1" style={{ background: "var(--bg-content)" }}>
           <div ref={scrollRef} className="absolute inset-0 flex overflow-auto p-6">
             {img && (
               <div className="relative m-auto shrink-0" style={{ width: W * scale, height: H * scale }}>
                 <Stage ref={stageRef} width={W * scale} height={H * scale} scaleX={scale} scaleY={scale}
                   onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp}
-                  style={{ cursor: tool === "select" ? "default" : "crosshair", boxShadow: bg.enabled ? "none" : "var(--shadow-lg)", borderRadius: bg.enabled ? 0 : 2 }}>
+                  style={{ cursor: tool === "select" ? "default" : "crosshair", boxShadow: bg.kind === "none" ? "0 2px 18px rgba(0,0,0,.10), 0 0 0 0.5px rgba(0,0,0,.08)" : "none", borderRadius: bg.kind === "none" ? 2 : 0 }}>
                   <Layer>
-                    {bg.enabled && (
-                      <>
-                        {bg.mode === "gradient"
-                          ? <Rect width={W} height={H} fillLinearGradientStartPoint={{ x: 0, y: 0 }} fillLinearGradientEndPoint={{ x: W, y: H }}
-                              fillLinearGradientColorStops={[0, g0, 1, g1]} />
-                          : <Rect width={W} height={H} fill={bg.color} />}
-                        {bg.shadow && <Rect x={ox} y={oy} width={iw} height={ih} cornerRadius={bg.radius * unit} fill="black"
-                          shadowColor="black" shadowBlur={40 * unit} shadowOpacity={0.45} shadowOffsetY={12 * unit} />}
-                      </>
-                    )}
-                    <Group ref={groupRef} x={ox} y={oy}
-                      clipFunc={bg.enabled ? (ctx) => { ctx.beginPath(); ctx.roundRect(0, 0, iw, ih, bg.radius * unit); ctx.closePath(); } : undefined}>
+                    <Backdrop bg={bg} layout={layout} img={img} />
+                    <Group ref={groupRef} x={ox} y={oy} clipFunc={groupClip(layout)}>
                       <KImage image={img} name="base" />
                       {all.map((s) => (
                         <ShapeNode key={s.id} s={s} unit={unit} base={img} counter={counters.get(s.id) ?? 0}
@@ -372,16 +376,14 @@ export default function Editor() {
               </motion.div>
             )}
           </AnimatePresence>
-          <div className="mat-hud tabular pointer-events-none absolute right-3 bottom-3 rounded-full px-2.5 py-1 text-[11px] font-medium">
-            {Math.round(W)} × {Math.round(H)} · {Math.round(scale * 100)}%
-          </div>
           <Toast text={toast} />
         </div>
 
-        <AnimatePresence>
-          {bg.enabled && <BackgroundPanel bg={bg} setBg={setBg} onClose={() => setBg({ ...bg, enabled: false })} />}
-        </AnimatePresence>
       </div>
+
+      <BottomBar zoom={zoom} canRevert={doc.base !== original || doc.shapes.length > 0} revert={revert}
+        materialize={() => api.writePng(exportPng())} share={doReveal} pin={doPin} copy={doCopy} upload={doUpload} />
     </div>
+    </MotionConfig>
   );
 }

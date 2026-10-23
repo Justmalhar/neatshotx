@@ -4,14 +4,16 @@ import { Check } from "lucide-react";
 import { materialize, spring } from "../../lib/motion";
 
 type Align = "start" | "center" | "end";
+const ORIGIN: Record<Align, string> = { start: "left", center: "center", end: "right" };
 const POS: Record<Align, string> = { start: "left-0", center: "left-1/2 -translate-x-1/2", end: "right-0" };
-const ORIGIN: Record<Align, string> = { start: "top left", center: "top center", end: "top right" };
 
 /** Popover that materializes from its trigger (transform-origin) and dismisses on outside press / Esc. */
-export default function Popover({ trigger, children, align = "center" }: {
+export default function Popover({ trigger, children, align = "center", up }: {
   trigger: (p: { open: boolean; toggle: () => void }) => ReactNode;
   children: ReactNode | ((close: () => void) => ReactNode);
   align?: Align;
+  /** Open above the trigger (bottom bar). */
+  up?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -29,8 +31,8 @@ export default function Popover({ trigger, children, align = "center" }: {
       {trigger({ open, toggle: () => setOpen((o) => !o) })}
       <AnimatePresence>
         {open && (
-          <div className={`absolute top-full z-50 mt-2 ${POS[align]}`}>
-            <motion.div {...materialize} transition={spring.ui} style={{ transformOrigin: ORIGIN[align] }}
+          <div className={`absolute z-50 ${up ? "bottom-full mb-2" : "top-full mt-2"} ${POS[align]}`}>
+            <motion.div {...materialize} transition={spring.ui} style={{ transformOrigin: `${up ? "bottom" : "top"} ${ORIGIN[align]}` }}
               className="mat-regular rounded-[var(--r-lg)] p-2">
               {typeof children === "function" ? children(close) : children}
             </motion.div>
