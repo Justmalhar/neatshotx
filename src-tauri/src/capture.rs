@@ -274,7 +274,8 @@ pub fn countdown(app: &AppHandle, secs: u64) {
     }
     let label = "countdown";
     let _ = windows::overlay(app, label, &format!("/countdown?s={secs}"))
-        .inner_size(180.0, 180.0)
+        .effects(windows::hud_effects(72.0))
+        .inner_size(144.0, 144.0)
         .center()
         .focused(false)
         .build();

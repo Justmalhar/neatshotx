@@ -79,3 +79,16 @@ pub fn raise_above_menubar(w: &WebviewWindow) {
 
 #[cfg(not(target_os = "macos"))]
 pub fn raise_above_menubar(_w: &WebviewWindow) {}
+
+/// Native HUD material for borderless overlay windows (vibrancy on macOS, acrylic on Windows).
+/// CSS backdrop-filter can't blur the desktop behind a transparent window; this can.
+pub fn hud_effects(radius: f64) -> tauri::utils::config::WindowEffectsConfig {
+    use tauri::window::{Effect, EffectState};
+    #[cfg(target_os = "macos")]
+    let effects = vec![Effect::HudWindow];
+    #[cfg(target_os = "windows")]
+    let effects = vec![Effect::Acrylic];
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let effects = vec![];
+    tauri::utils::config::WindowEffectsConfig { effects, state: Some(EffectState::Active), radius: Some(radius), color: None, ..Default::default() }
+}

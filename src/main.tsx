@@ -1,6 +1,7 @@
 import { Component, StrictMode, lazy, Suspense, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import { installDesktopBehavior } from "./ui/desktop";
 
 const routes: Record<string, React.LazyExoticComponent<() => React.JSX.Element | null>> = {
   selector: lazy(() => import("./views/Selector")),
@@ -16,6 +17,10 @@ const opaque = new Set(["editor", "home", "pin", "welcome"]);
 
 const name = location.hash.replace(/^#\/?/, "").split("?")[0] || "home";
 if (!opaque.has(name)) document.body.classList.add("transparent");
+installDesktopBehavior(name, {
+  vibrancy: ["scroll-bar", "countdown"].includes(name),
+  closable: ["editor", "home", "pin", "welcome"].includes(name),
+});
 const View = routes[name] ?? routes.home;
 
 /** A crashed view shows its error instead of a blank window. */

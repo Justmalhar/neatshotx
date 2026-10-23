@@ -29,6 +29,7 @@ pub fn start(app: &AppHandle, r: capture::Region, xcap_index: usize, xcap_rect: 
         let _ = old.destroy();
     }
     if let Err(e) = windows::overlay(app, "scroll-bar", "/scroll-bar")
+        .effects(windows::hud_effects(28.0))
         .inner_size(320.0, 56.0)
         .position(24.0, 24.0)
         .focused(false)

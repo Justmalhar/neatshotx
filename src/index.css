@@ -37,6 +37,7 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.22), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 
+  --r-xs: 4px;
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;
@@ -69,7 +70,7 @@
   :root { --mat-stroke: currentColor; --separator: var(--label-2); }
 }
 
-html, body, #root { height: 100%; margin: 0; }
+html, body, #root { height: 100%; margin: 0; overscroll-behavior: none; }
 body {
   font: 13px/1.38 var(--font);
   letter-spacing: -0.003em;
@@ -86,7 +87,7 @@ body.transparent { background: transparent; }
 
 /* Type scale — size-specific tracking (tight large, neutral small) */
 .t-large { font: 600 26px/1.15 var(--font-display); letter-spacing: -0.022em; }
-.t-title { font: 600 17px/1.25 var(--font-display); letter-spacing: -0.016em; }
+.t-title { font: 600 15px/1.25 var(--font-display); letter-spacing: -0.012em; }
 .t-headline { font-weight: 600; font-size: 13px; letter-spacing: -0.006em; }
 .t-body { font-size: 13px; }
 .t-callout { font-size: 12px; color: var(--label-2); }
@@ -159,3 +160,108 @@ input[type="range"] { accent-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
 }
+
+
+/* ───────────── Native-first system (see DESIGN-SYSTEM.md) ───────────── */
+
+/* macOS: follow the user's accent + appearance via WebKit system colors. */
+@supports (color: -apple-system-label) {
+  :root {
+    --label: -apple-system-label;
+    --label-2: -apple-system-secondary-label;
+    --label-3: -apple-system-tertiary-label;
+    --separator: -apple-system-separator;
+    --accent: -apple-system-control-accent;
+    --bg-window: -apple-system-window-background;
+    --bg-content: -apple-system-text-background;
+  }
+}
+:root {
+  --bg-control: color-mix(in srgb, var(--bg-content) 92%, var(--label) 8%);
+  --hud-bg: rgba(28, 28, 30, 0.78);
+  --hud-fg: rgba(255, 255, 255, 0.92);
+  --hud-fg-2: rgba(235, 235, 245, 0.6);
+  --r-full: 9999px;
+  accent-color: var(--accent);
+}
+
+/* Desktop behavior: arrow cursor, no stray selection/drag, keyboard-only focus rings. */
+button, [role="button"], a, label, summary { cursor: default; }
+img, a { -webkit-user-drag: none; }
+input, textarea, [contenteditable="true"] { user-select: text; -webkit-user-select: text; }
+:focus { outline: none; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 1px; border-radius: var(--r-sm); }
+
+/* Native controls: keep styling minimal so WebKit/WebView2/GTK draw the real OS control. */
+.ns-check { margin: 0; flex-shrink: 0; }
+.ns-select { font: inherit; font-size: 13px; }
+.ns-range { margin: 0; }
+.ns-field {
+  font: inherit; font-size: 13px; color: var(--label); height: 22px; padding: 0 6px;
+  border-radius: var(--r-sm); border: 0; background: var(--bg-content);
+  box-shadow: inset 0 0 0 0.5px var(--separator), 0 0.5px 1px rgba(0,0,0,0.06);
+}
+textarea.ns-field { height: auto; padding: 4px 6px; resize: none; }
+.ns-field:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 0; }
+
+/* Push buttons (in-window): 22px, 6px radius, darken on press. */
+.ns-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 22px; padding: 0 10px; border-radius: var(--r-sm); font: inherit; font-size: 13px; color: var(--label);
+  background: var(--bg-content); box-shadow: inset 0 0 0 0.5px var(--separator), 0 0.5px 1.5px rgba(0,0,0,0.12);
+  white-space: nowrap;
+}
+.ns-btn:active { filter: brightness(0.92); }
+.ns-btn:disabled { opacity: 0.4; }
+.ns-btn--primary { background: var(--accent); color: var(--accent-fg); box-shadow: 0 0.5px 1.5px rgba(0,0,0,0.2); }
+.ns-btn--destructive { color: var(--danger); }
+.ns-btn--plain { background: transparent; box-shadow: none; color: var(--accent); padding: 0 4px; }
+.ns-btn--large { height: 28px; padding: 0 14px; }
+
+/* Toolbar icon buttons (in-window toolbars): 28px square, no bezel until hover. */
+.ns-tool {
+  display: inline-grid; place-items: center; height: 28px; min-width: 28px; padding: 0 6px; gap: 4px;
+  grid-auto-flow: column; border-radius: var(--r-sm); color: var(--label); font-size: 13px;
+}
+.ns-tool:hover { background: var(--fill); }
+.ns-tool:active, .ns-tool[aria-pressed="true"] { background: var(--fill-2); }
+.ns-tool[aria-pressed="true"] { color: var(--accent); }
+.ns-tool:disabled { opacity: 0.35; }
+
+/* Floating capsules (editor bars, overlays): 32px, full radius, light bezel. */
+.ns-capsule {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; min-width: 32px; padding: 0 12px; border-radius: var(--r-full);
+  font-size: 13px; font-weight: 500; color: var(--label); background: var(--bg-content);
+  box-shadow: 0 0 0 0.5px var(--separator), 0 1px 3px rgba(0,0,0,0.1);
+  transition: transform 100ms var(--ease-out), filter 100ms;
+}
+.ns-capsule:active { transform: scale(0.97); filter: brightness(0.95); }
+.ns-capsule--icon { padding: 0; width: 32px; }
+.ns-capsule--primary { background: var(--accent); color: var(--accent-fg); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.ns-capsule[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.ns-capsule:disabled { opacity: 0.4; }
+
+/* Segmented control: 22px track, 6px radius, selected segment raised. */
+.ns-segmented { display: inline-flex; height: 22px; padding: 1px; border-radius: var(--r-sm); background: var(--fill); }
+.ns-segmented > button { position: relative; padding: 0 10px; border-radius: 5px; font-size: 12px; color: var(--label); }
+.ns-segmented > button[aria-pressed="true"] { background: var(--bg-content); box-shadow: 0 0.5px 1.5px rgba(0,0,0,0.18), 0 0 0 0.5px var(--separator); }
+
+/* HUD (floating dark chrome). With native vibrancy the window itself is the material
+   (html[data-vibrancy]); otherwise fall back to a solid-ish dark fill. */
+.hud { color: var(--hud-fg); background: var(--hud-bg); }
+html[data-vibrancy] .hud--window { background: transparent; }
+.hud-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; min-width: 28px;
+  padding: 0 10px; border-radius: var(--r-full); font-size: 13px; font-weight: 500; color: var(--hud-fg);
+  background: rgba(255,255,255,0.12);
+}
+.hud-btn:hover { background: rgba(255,255,255,0.2); }
+.hud-btn:active { background: rgba(255,255,255,0.28); }
+.hud-btn--icon { padding: 0; width: 28px; }
+.hud-btn--primary { background: var(--accent); color: var(--accent-fg); }
+.hud-btn--danger { background: #ff453a; color: #fff; }
+
+/* Grouped list (Preferences-style). */
+.ns-group { border-radius: var(--r-md); background: var(--bg-content); box-shadow: inset 0 0 0 0.5px var(--separator); }
+.ns-group > * + * { border-top: 0.5px solid var(--separator); }
