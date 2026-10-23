@@ -4,7 +4,7 @@ export type Region = { monitor: number; x: number; y: number; w: number; h: numb
 export type WindowRect = { id: number; title: string; app: string; x: number; y: number; w: number; h: number };
 export type Settings = {
   save_dir: string;
-  image_format: "png" | "jpg";
+  image_format: "png" | "jpg" | "webp";
   copy_after_capture: boolean;
   save_after_capture: boolean;
   show_quick_access: boolean;
@@ -20,8 +20,20 @@ export type Settings = {
   selector_show_magnifier: boolean;
   play_sounds: boolean;
   history_keep_days: number;
+  window_shadow: boolean;
+  window_padding: number;
+  scale_retina_1x: boolean;
+  file_name_template: string;
+  ask_for_name: boolean;
+  shutter_sound: "default" | "subtle" | "pop" | "classic" | "none";
+  notifications: boolean;
+  show_menu_bar_icon: boolean;
+  qa_follow_active_screen: boolean;
+  onboarded: boolean;
   shortcuts: Record<string, string>;
 };
+
+export type HistoryItem = { path: string; mtime: number };
 
 export const api = {
   listWindows: (monitor: number) => invoke<WindowRect[]>("list_windows", { monitor }),
@@ -30,7 +42,7 @@ export const api = {
   copyImage: (path: string) => invoke("copy_image", { path }),
   copyPng: (dataB64: string) => invoke("copy_png", { dataB64 }),
   writePng: (dataB64: string, path?: string, copy = false) => invoke<string>("write_png", { dataB64, path, copy }),
-  listHistory: () => invoke<string[]>("list_history"),
+  listHistory: () => invoke<HistoryItem[]>("list_history"),
   deleteCapture: (path: string) => invoke("delete_capture", { path }),
   copyFile: (src: string, dest: string) => invoke("copy_file", { src, dest }),
   finishScroll: (keep: boolean) => invoke("finish_scroll", { keep }),

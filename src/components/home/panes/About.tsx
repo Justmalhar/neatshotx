@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Aperture } from "lucide-react";
+import { api } from "../../../lib/api";
 import { Btn } from "../form";
 
 export default function About() {
@@ -16,6 +17,7 @@ export default function About() {
       <div className="mt-3 flex gap-2">
         <Btn onClick={() => openUrl("https://github.com/justmalhar")}>GitHub</Btn>
         <Btn onClick={() => openUrl("https://www.justmalhar.com")}>Website</Btn>
+        <Btn onClick={() => api.action("welcome-guide")}>Welcome Guide…</Btn>
       </div>
     </div>
   );

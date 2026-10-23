@@ -2,7 +2,8 @@ import { type ReactNode } from "react";
 import { motion } from "motion/react";
 import { ChevronDown, Minus, Plus } from "lucide-react";
 import { spring } from "../../lib/motion";
-import { EMOJIS, SIZES, type Tool } from "./types";
+import { EMOJIS, SIZES, type TextFont, type TextStyle, type Tool } from "./types";
+import { FONTS, textCss } from "./text";
 import ColorWell from "./ColorWell";
 import Popover from "./Popover";
 import Tip from "./Tip";
@@ -10,7 +11,7 @@ import { cap } from "./IconButton";
 import ArrowGlyph from "./ArrowGlyph";
 import { ARROW_STYLES, type ArrowStyle } from "./arrows";
 
-export type StyleValues = { color: string; size: number; emoji: string; textBg: "none" | "solid"; counterStart: number; arrowStyle: ArrowStyle; arrowInverse: boolean };
+export type StyleValues = { color: string; size: number; emoji: string; textStyle: TextStyle; font: TextFont; counterStart: number; arrowStyle: ArrowStyle; arrowInverse: boolean };
 export type StylePatch = Partial<StyleValues>;
 
 const COLOR = ["arrow", "line", "rect", "filled", "ellipse", "pen", "highlighter", "text", "counter"];
@@ -22,6 +23,13 @@ const HINT: Partial<Record<Tool, string>> = {
   spotlight: "Drag to spotlight an area",
   crop: "Drag to crop, then press Return",
 };
+
+const TEXT_STYLES: { id: TextStyle; label: string }[] = [
+  { id: "plain", label: "Plain" }, { id: "outline", label: "Outline" }, { id: "solid", label: "Solid" }, { id: "translucent", label: "Translucent" },
+];
+const FONT_OPTS: { id: TextFont; label: string }[] = [
+  { id: "system", label: "System" }, { id: "rounded", label: "Rounded" }, { id: "mono", label: "Mono" }, { id: "serif", label: "Serif" },
+];
 
 function SizeButton({ kind, size, onChange }: { kind: Tool; size: number; onChange: (n: number) => void }) {
   const glyph = kind === "text" || kind === "emoji" || kind === "counter";
@@ -92,17 +100,38 @@ export default function StyleBar({ kind, v, onChange }: { kind: Tool; v: StyleVa
     </Popover>,
   );
   if (kind === "text") items.push(
-    <div className={cap + " gap-0 p-[3px]"}>
-      {(["none", "solid"] as const).map((b) => (
-        <Tip key={b} label={b === "none" ? "No background" : "Solid background"}>
-          <button onClick={() => onChange({ textBg: b })} aria-pressed={v.textBg === b}
-            className="relative grid h-[26px] w-9 place-items-center rounded-full text-xs font-bold">
-            {v.textBg === b && <motion.span layoutId="textbg-pill" transition={spring.ui} className="absolute inset-0 rounded-full bg-[var(--fill-2)]" />}
-            <span className="relative rounded px-1" style={b === "solid" ? { background: v.color, color: "#fff" } : undefined}>Aa</span>
-          </button>
-        </Tip>
-      ))}
-    </div>,
+    <Popover trigger={({ open, toggle }) => (
+      <Tip label="Text style">
+        <button className={cap + " w-[68px] gap-1.5"} aria-pressed={open} onClick={toggle} aria-label="Text style">
+          <span className="rounded px-1 text-[13px] font-bold leading-[18px]" style={{ ...textCss(v.textStyle, v.color, 13), fontFamily: FONTS[v.font] }}>Aa</span>
+          <ChevronDown size={13} strokeWidth={2.5} className="text-[var(--label-2)]" />
+        </button>
+      </Tip>
+    )}>
+      {() => (
+        <div className="flex w-[228px] flex-col gap-2">
+          <div className="grid grid-cols-2 gap-1">
+            {TEXT_STYLES.map((t) => (
+              <motion.button key={t.id} whileTap={{ scale: 0.96 }} transition={spring.press} aria-label={t.label} title={t.label}
+                aria-pressed={v.textStyle === t.id} onClick={() => onChange({ textStyle: t.id })}
+                className="grid h-11 place-items-center rounded-[var(--r-md,10px)]"
+                style={{ boxShadow: v.textStyle === t.id ? "inset 0 0 0 2px var(--accent)" : "inset 0 0 0 0.5px var(--separator)", background: "color-mix(in srgb, var(--label) 8%, transparent)" }}>
+                <span className="px-2.5 py-0.5 text-lg font-bold leading-6" style={{ ...textCss(t.id, v.color, 18), fontFamily: FONTS[v.font], borderRadius: 999 }}>Aa</span>
+              </motion.button>
+            ))}
+          </div>
+          <div className="flex gap-1" role="group" aria-label="Font">
+            {FONT_OPTS.map((f) => (
+              <button key={f.id} onClick={() => onChange({ font: f.id })} aria-pressed={v.font === f.id} title={f.label} aria-label={f.label}
+                className="relative grid h-8 flex-1 place-items-center rounded-full text-[15px] font-bold" style={{ fontFamily: FONTS[f.id] }}>
+                {v.font === f.id && <motion.span layoutId="font-pill" transition={spring.ui} className="absolute inset-0 rounded-full bg-[var(--fill-2)]" />}
+                <span className="relative">Aa</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </Popover>,
   );
   if (kind === "counter") items.push(
     <div className={cap + " gap-0 px-1"}>

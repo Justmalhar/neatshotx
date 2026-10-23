@@ -15,7 +15,7 @@ use crate::{capture, windows};
 #[derive(Default)]
 pub struct ScrollState {
     running: Arc<AtomicBool>,
-    result: Arc<Mutex<Option<RgbaImage>>>,
+    result: Arc<Mutex<Option<(RgbaImage, usize)>>>,
 }
 
 pub fn start(app: &AppHandle, r: capture::Region, xcap_index: usize, xcap_rect: (i32, i32, u32, u32), image_w: u32) -> Result<(), String> {
@@ -92,10 +92,10 @@ pub fn start(app: &AppHandle, r: capture::Region, xcap_index: usize, xcap_rect: 
                 let _ = w.destroy();
             }
             if let Some(img) = stitched {
-                let _ = capture::handle_capture(&app, img);
+                let _ = capture::handle_capture(&app, img, xcap_index);
             }
         } else {
-            *result.lock().unwrap() = stitched;
+            *result.lock().unwrap() = stitched.map(|img| (img, xcap_index));
         }
     });
     Ok(())
@@ -149,9 +149,9 @@ pub async fn finish_scroll(app: AppHandle, keep: bool) -> Result<(), String> {
     }
     // Wait for the worker to publish its result.
     for _ in 0..50 {
-        if let Some(img) = st.result.lock().unwrap().take() {
+        if let Some((img, monitor)) = st.result.lock().unwrap().take() {
             if keep {
-                capture::handle_capture(&app, img)?;
+                capture::handle_capture(&app, img, monitor)?;
             }
             return Ok(());
         }

@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager};
 #[serde(default)]
 pub struct Settings {
     pub save_dir: String,
-    pub image_format: String, // "png" | "jpg"
+    pub image_format: String, // "png" | "jpg" | "webp"
     pub copy_after_capture: bool,
     pub save_after_capture: bool,
     pub show_quick_access: bool,
@@ -23,6 +23,16 @@ pub struct Settings {
     pub selector_show_magnifier: bool,
     pub play_sounds: bool,
     pub history_keep_days: u32, // 0 = forever
+    pub window_shadow: bool,
+    pub window_padding: u32,
+    pub scale_retina_1x: bool,
+    pub file_name_template: String, // tokens: {date} {time} {counter}
+    pub ask_for_name: bool,
+    pub shutter_sound: String, // "default" | "subtle" | "pop" | "classic" | "none"
+    pub notifications: bool,
+    pub show_menu_bar_icon: bool,
+    pub qa_follow_active_screen: bool,
+    pub onboarded: bool,
     pub shortcuts: BTreeMap<String, String>, // action -> accelerator
 }
 
@@ -58,6 +68,16 @@ impl Default for Settings {
             selector_show_magnifier: false,
             play_sounds: true,
             history_keep_days: 0,
+            window_shadow: true,
+            window_padding: 0,
+            scale_retina_1x: false,
+            file_name_template: "NeatShotX {date} at {time}".into(),
+            ask_for_name: false,
+            shutter_sound: "default".into(),
+            notifications: false,
+            show_menu_bar_icon: true,
+            qa_follow_active_screen: true,
+            onboarded: false,
             shortcuts,
         }
     }
@@ -94,13 +114,31 @@ pub fn get_settings(app: AppHandle) -> Settings {
     get(&app)
 }
 
-#[tauri::command]
-pub fn set_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
-    let p = path(&app);
+/// Persists and applies settings (shortcuts, tray menu, tray visibility).
+pub fn save(app: &AppHandle, settings: Settings) -> Result<(), String> {
+    let p = path(app);
     fs::create_dir_all(p.parent().unwrap()).map_err(|e| e.to_string())?;
     fs::write(&p, serde_json::to_vec_pretty(&settings).unwrap()).map_err(|e| e.to_string())?;
     *app.state::<SettingsState>().0.lock().unwrap() = settings;
-    crate::shortcuts::register(&app);
-    crate::tray::refresh(&app); // shortcut hints in the menu
+    crate::shortcuts::register(app);
+    crate::tray::refresh(app); // shortcut hints in the menu
+    crate::tray::apply_visibility(app);
     Ok(())
+}
+
+#[tauri::command]
+pub fn set_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
+    save(&app, settings)
+}
+
+/// Marks the welcome guide as seen without clobbering other fields a stale Preferences window holds.
+pub fn mark_onboarded(app: &AppHandle) {
+    let mut s = get(app);
+    s.onboarded = true;
+    let _ = save(app, s);
+}
+
+/// Config dir file holding the persisted `{counter}` value.
+pub fn counter_path(app: &AppHandle) -> PathBuf {
+    app.path().app_config_dir().unwrap().join("counter")
 }

@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Mutex, thread, time::Duration};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_notification::NotificationExt;
 use xcap::{Monitor, Window};
 
 use crate::{desktop, settings, windows};
@@ -44,8 +46,16 @@ pub fn history_dir(app: &AppHandle) -> PathBuf {
 }
 
 pub fn new_capture_path(app: &AppHandle, ext: &str) -> PathBuf {
-    let name = chrono::Local::now().format("NeatShotX %Y-%m-%d at %H.%M.%S%.3f");
-    history_dir(app).join(format!("{name}.{ext}"))
+    crate::naming::capture_path(app, &history_dir(app), &settings::get(app).file_name_template, ext)
+}
+
+/// Backing scale factor of an xcap monitor (1.0 when unknown).
+pub fn monitor_scale(xcap_index: usize) -> f64 {
+    Monitor::all()
+        .ok()
+        .and_then(|v| v.into_iter().nth(xcap_index))
+        .and_then(|m| m.scale_factor().ok())
+        .unwrap_or(1.0) as f64
 }
 
 /// Freeze every monitor and open one selection overlay per monitor.
@@ -148,7 +158,7 @@ pub async fn list_windows(app: AppHandle, monitor: usize) -> Result<Vec<WindowRe
         .map_err(|e| e.to_string())?
         .into_iter()
         .filter(|w| !w.is_minimized().unwrap_or(true))
-        .filter(|w| !w.app_name().unwrap_or_default().to_lowercase().contains("neatshotx"))
+        .filter(|w| !is_system_window(&w.app_name().unwrap_or_default()))
         .filter(|w| w.width().unwrap_or(0) > 40 && w.height().unwrap_or(0) > 40)
         .collect();
     ws.sort_by_key(|w| std::cmp::Reverse(w.z().unwrap_or(0)));
@@ -164,6 +174,16 @@ pub async fn list_windows(app: AppHandle, monitor: usize) -> Result<Vec<WindowRe
             h: (w.height().unwrap_or(0) as f64 * scale) as u32,
         })
         .collect())
+}
+
+/// Our own overlays and OS chrome (e.g. the Dock's invisible full-screen window on macOS) aren't pickable windows.
+fn is_system_window(app_name: &str) -> bool {
+    const SKIP: &[&str] = &[
+        "neatshotx", "dock", "window server", "windowserver", "control center", "controlcenter",
+        "systemuiserver", "notification center", "notificationcenter", "screenshot", "wallpaper",
+    ];
+    let n = app_name.to_lowercase();
+    SKIP.iter().any(|s| n.contains(s))
 }
 
 fn end_selection(app: &AppHandle) {
@@ -200,16 +220,17 @@ pub async fn finish_selection(app: AppHandle, region: Region, window_id: Option<
             *state(&app).last_region.lock().unwrap() = Some(region);
             let secs = settings::get(&app).self_timer_secs;
             countdown(&app, secs);
-            let img = capture_live(xcap_index, region)?;
-            handle_capture(&app, img)?;
+            let img = without_overlay(&app, || capture_live(xcap_index, region))?;
+            handle_capture(&app, img, xcap_index)?;
         }
         _ => {
             *state(&app).last_region.lock().unwrap() = Some(region);
+            let s = settings::get(&app);
             let img = match window_id.and_then(capture_window) {
-                Some(img) => img,
+                Some(img) => crate::window_style::style(img, s.window_shadow, s.window_padding),
                 None => crop,
             };
-            handle_capture(&app, img)?;
+            handle_capture(&app, img, xcap_index)?;
         }
     }
     state(&app).frozen.lock().unwrap().clear();
@@ -224,6 +245,20 @@ fn clamp(r: Region, maxw: u32, maxh: u32) -> Region {
 
 fn capture_window(id: u32) -> Option<RgbaImage> {
     Window::all().ok()?.into_iter().find(|w| w.id().ok() == Some(id))?.capture_image().ok()
+}
+
+/// Runs a live grab with the Quick Access Overlay hidden so it never lands in the shot.
+fn without_overlay<T>(app: &AppHandle, grab: impl FnOnce() -> T) -> T {
+    let qa = app.get_webview_window("quick-access").filter(|w| w.is_visible().unwrap_or(false));
+    if let Some(w) = &qa {
+        let _ = w.hide();
+        thread::sleep(Duration::from_millis(80)); // let the compositor drop it
+    }
+    let out = grab();
+    if let Some(w) = qa {
+        let _ = w.show();
+    }
+    out
 }
 
 pub fn capture_live(xcap_index: usize, r: Region) -> Result<RgbaImage, String> {
@@ -250,45 +285,90 @@ pub fn countdown(app: &AppHandle, secs: u64) {
     thread::sleep(Duration::from_millis(150));
 }
 
-pub fn capture_fullscreen(app: &AppHandle) -> Result<(), String> {
+/// Every display, or only `display` (0-based) when given.
+pub fn capture_fullscreen(app: &AppHandle, display: Option<usize>) -> Result<(), String> {
     let s = settings::get(app);
     let hid = s.hide_desktop_icons_while_capturing && desktop::set_icons_visible(false).is_ok();
     if hid {
         thread::sleep(Duration::from_millis(600));
     }
-    let shots: Vec<_> = Monitor::all()
-        .map_err(|e| e.to_string())?
-        .iter()
-        .filter_map(|m| m.capture_image().ok())
-        .collect();
+    let shots: Vec<_> = without_overlay(app, || {
+        Monitor::all().map(|ms| {
+            ms.iter()
+                .enumerate()
+                .filter(|(i, _)| display.is_none_or(|d| d == *i))
+                .filter_map(|(i, m)| Some((m.capture_image().ok()?, i)))
+                .collect()
+        })
+    })
+    .map_err(|e| e.to_string())?;
     if hid {
         let _ = desktop::set_icons_visible(true);
     }
-    for img in shots {
-        handle_capture(app, img)?;
+    if shots.is_empty() {
+        return Err("No such display".into());
+    }
+    for (img, i) in shots {
+        handle_capture(app, img, i)?;
     }
     Ok(())
 }
 
+/// Captures an exact region without the selector (URL scheme). x/y/w/h are in xcap units
+/// (points on macOS, pixels elsewhere), relative to the display's origin.
+pub fn capture_rect(app: &AppHandle, display: usize, (x, y, w, h): (f64, f64, f64, f64)) -> Result<(), String> {
+    let m = Monitor::all().map_err(|e| e.to_string())?.into_iter().nth(display).ok_or("No such display")?;
+    let img = without_overlay(app, || m.capture_image()).map_err(|e| e.to_string())?;
+    let k = img.width() as f64 / m.width().unwrap_or(img.width()).max(1) as f64;
+    let px = |v: f64| (v * k).round().max(0.0) as u32;
+    let r = clamp(Region { monitor: display, x: px(x), y: px(y), w: px(w), h: px(h) }, img.width(), img.height());
+    *state(app).last_region.lock().unwrap() = Some(r);
+    handle_capture(app, imageops::crop_imm(&img, r.x, r.y, r.w, r.h).to_image(), display).map(|_| ())
+}
+
 pub fn capture_previous_area(app: &AppHandle) -> Result<(), String> {
     let r = state(app).last_region.lock().unwrap().ok_or("No previous area yet")?;
-    let img = capture_live(r.monitor, r)?;
-    handle_capture(app, img).map(|_| ())
+    let img = without_overlay(app, || capture_live(r.monitor, r))?;
+    handle_capture(app, img, r.monitor).map(|_| ())
 }
 
 /// Post-capture pipeline: persist to history, optional save/copy, Quick Access Overlay.
-pub fn handle_capture(app: &AppHandle, img: RgbaImage) -> Result<PathBuf, String> {
+/// `monitor` is the xcap index the pixels came from (for "Scale Retina screenshots to 1x").
+pub fn handle_capture(app: &AppHandle, mut img: RgbaImage, monitor: usize) -> Result<PathBuf, String> {
     let s = settings::get(app);
-    let ext = if s.image_format == "jpg" { "jpg" } else { "png" };
+    if s.scale_retina_1x {
+        let k = monitor_scale(monitor);
+        if k > 1.0 {
+            img = imageops::resize(&img, (img.width() as f64 / k).round().max(1.0) as u32, (img.height() as f64 / k).round().max(1.0) as u32, imageops::FilterType::Lanczos3);
+        }
+    }
+    let ext = match s.image_format.as_str() {
+        "jpg" => "jpg",
+        "webp" => "webp",
+        _ => "png",
+    };
     let path = new_capture_path(app, ext);
     if ext == "jpg" {
         image::DynamicImage::ImageRgba8(img.clone()).to_rgb8().save(&path)
     } else {
-        img.save(&path)
+        img.save(&path) // webp: the image crate's encoder is lossless-only
     }
     .map_err(|e| e.to_string())?;
     if s.save_after_capture && !s.save_dir.is_empty() {
-        let _ = std::fs::copy(&path, PathBuf::from(&s.save_dir).join(path.file_name().unwrap()));
+        let name = path.file_name().unwrap();
+        let dest = if s.ask_for_name {
+            app.dialog()
+                .file()
+                .set_directory(&s.save_dir)
+                .set_file_name(name.to_string_lossy())
+                .blocking_save_file()
+                .and_then(|f| f.into_path().ok())
+        } else {
+            Some(PathBuf::from(&s.save_dir).join(name))
+        };
+        if let Some(dest) = dest {
+            let _ = std::fs::copy(&path, dest);
+        }
     }
     if s.copy_after_capture {
         let _ = app.clipboard().write_image(&tauri::image::Image::new(img.as_raw(), img.width(), img.height()));
@@ -311,6 +391,9 @@ pub fn announce(app: &AppHandle, path: &std::path::Path) {
     let _ = app.emit("capture-added", &p);
     if quick_access {
         crate::open_quick_access(app, &p);
+    } else if s.notifications {
+        let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let _ = app.notification().builder().title("Screenshot saved").body(name).show();
     }
 }
 
@@ -338,13 +421,26 @@ pub async fn write_png(app: AppHandle, data_b64: String, path: Option<String>, c
     Ok(out.to_string_lossy().into())
 }
 
+#[derive(Serialize)]
+pub struct HistoryItem {
+    pub path: String,
+    /// Modified time, ms since the Unix epoch (day-grouping fallback for custom file names).
+    pub mtime: u64,
+}
+
 #[tauri::command]
-pub async fn list_history(app: AppHandle) -> Vec<String> {
+pub async fn list_history(app: AppHandle) -> Vec<HistoryItem> {
     let mut items: Vec<_> = std::fs::read_dir(history_dir(&app))
-        .map(|rd| rd.flatten().map(|e| e.path()).collect())
+        .map(|rd| rd.flatten().filter_map(|e| Some((e.path(), e.metadata().ok()?.modified().ok()?))).collect())
         .unwrap_or_else(|_| vec![]);
-    items.sort_by_key(|p| std::cmp::Reverse(std::fs::metadata(p).and_then(|m| m.modified()).ok()));
-    items.into_iter().map(|p| p.to_string_lossy().into()).collect()
+    items.sort_by_key(|(_, t)| std::cmp::Reverse(*t));
+    items
+        .into_iter()
+        .map(|(p, t)| HistoryItem {
+            path: p.to_string_lossy().into(),
+            mtime: t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0),
+        })
+        .collect()
 }
 
 #[tauri::command]

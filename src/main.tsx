@@ -10,8 +10,9 @@ const routes: Record<string, React.LazyExoticComponent<() => React.JSX.Element |
   countdown: lazy(() => import("./views/Countdown")),
   "scroll-bar": lazy(() => import("./views/ScrollBar")),
   home: lazy(() => import("./views/Home")),
+  welcome: lazy(() => import("./views/Welcome")),
 };
-const opaque = new Set(["editor", "home", "pin"]);
+const opaque = new Set(["editor", "home", "pin", "welcome"]);
 
 const name = location.hash.replace(/^#\/?/, "").split("?")[0] || "home";
 if (!opaque.has(name)) document.body.classList.add("transparent");

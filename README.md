@@ -48,3 +48,14 @@ Editor: V A R F E L P H T N X B S J C select tools, ⌘Z / ⇧⌘Z, ⌘C copy, �
 `scrolling-capture`, `self-timer`, `annotate`, `open-from-clipboard`, `pin-image`,
 `restore-recently-closed`, `toggle-desktop-icons`, `hide-desktop-icons`, `show-desktop-icons`, `open-history`, `open-settings`.
 The same names work as CLI arguments: `neatshotx capture-area`.
+
+Parameters (CleanShot API style; coordinates are in display points on macOS / pixels elsewhere, relative to the display origin; `display` is a 0-based index, default 0):
+
+| URL | Effect |
+| --- | --- |
+| `neatshotx://capture-area?x=100&y=200&width=800&height=600&display=1` | Capture that exact region, no selector |
+| `neatshotx://capture-fullscreen?display=1` | Capture one display (omit `display` for all) |
+| `neatshotx://open-annotate?filepath=/abs/path.png` | Open the editor on a file |
+| `neatshotx://pin?filepath=/abs/path.png` | Pin a file to the screen |
+
+Launching NeatShotX again with no arguments opens Preferences (useful when the menu bar icon is hidden).

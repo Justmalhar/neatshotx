@@ -4,17 +4,17 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { motion } from "motion/react";
 import { Copy, FolderOpen, Image as ImageIcon, Pencil, Pin, Trash2 } from "lucide-react";
-import { api, fileName, fileSrc } from "../../lib/api";
+import { api, fileName, fileSrc, type HistoryItem } from "../../lib/api";
 import { spring } from "../../lib/motion";
 import { Btn, PopUp } from "./form";
 import type { PaneProps } from "./panes/types";
 
 const KEEP: [number, string][] = [[0, "Forever"], [1, "1 day"], [7, "1 week"], [30, "1 month"], [90, "3 months"]];
 
-/** "NeatShotX 2025-01-31 at 14.05.09.123.png" -> Date, or null. */
-const stamp = (p: string) => {
-  const m = fileName(p).match(/(\d{4})-(\d{2})-(\d{2}) at (\d{2})\.(\d{2})\.(\d{2})/);
-  return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
+/** Capture time: parsed from the default "… 2025-01-31 at 14.05.09" name, else the file's mtime (custom templates). */
+const stamp = ({ path, mtime }: HistoryItem) => {
+  const m = fileName(path).match(/(\d{4})-(\d{2})-(\d{2}) at (\d{2})\.(\d{2})\.(\d{2})/);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : new Date(mtime);
 };
 const dayLabel = (d: Date | null) => {
   if (!d) return "Other";
@@ -25,7 +25,7 @@ const dayLabel = (d: Date | null) => {
 };
 
 export default function History({ s, set }: PaneProps) {
-  const [items, setItems] = useState<string[]>([]);
+  const [items, setItems] = useState<HistoryItem[]>([]);
   const [rev, setRev] = useState(0);
   const refresh = () => api.listHistory().then(setItems);
   useEffect(() => {
@@ -35,11 +35,11 @@ export default function History({ s, set }: PaneProps) {
   }, []);
 
   const groups = useMemo(() => {
-    const out: { label: string; items: string[] }[] = [];
-    for (const p of items) {
-      const label = dayLabel(stamp(p));
+    const out: { label: string; items: HistoryItem[] }[] = [];
+    for (const it of items) {
+      const label = dayLabel(stamp(it));
       const g = out.find((x) => x.label === label);
-      g ? g.items.push(p) : out.push({ label, items: [p] });
+      g ? g.items.push(it) : out.push({ label, items: [it] });
     }
     return out;
   }, [items]);
@@ -74,7 +74,7 @@ export default function History({ s, set }: PaneProps) {
         <section key={g.label} className="mb-6">
           <h2 className="t-headline mb-2">{g.label}</h2>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
-            {g.items.map((p) => <Card key={p} p={p} rev={rev} onDeleted={refresh} />)}
+            {g.items.map((it) => <Card key={it.path} it={it} rev={rev} onDeleted={refresh} />)}
           </div>
         </section>
       ))}
@@ -82,8 +82,9 @@ export default function History({ s, set }: PaneProps) {
   );
 }
 
-function Card({ p, rev, onDeleted }: { p: string; rev: number; onDeleted: () => void }) {
-  const d = stamp(p);
+function Card({ it, rev, onDeleted }: { it: HistoryItem; rev: number; onDeleted: () => void }) {
+  const p = it.path;
+  const d = stamp(it);
   return (
     <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.99 }} transition={spring.ui} className="group" title={fileName(p)}
       onDoubleClick={() => api.openEditor(p)}>
@@ -97,7 +98,7 @@ function Card({ p, rev, onDeleted }: { p: string; rev: number; onDeleted: () => 
           <A t="Delete" on={() => api.deleteCapture(p).then(onDeleted)}><Trash2 size={14} /></A>
         </div>
       </div>
-      <div className="t-caption truncate px-1 pt-1.5">{d ? d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : fileName(p)}</div>
+      <div className="t-caption truncate px-1 pt-1.5">{d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</div>
     </motion.div>
   );
 }

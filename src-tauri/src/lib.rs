@@ -1,22 +1,23 @@
 mod capture;
 mod desktop;
+mod link;
+mod naming;
 mod scroll;
 mod settings;
 mod shortcuts;
 mod tray;
+mod window_style;
 mod windows;
 
 use std::sync::Mutex;
-use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, RunEvent,
-};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, RunEvent};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
-/// Paths waiting to be shown in the Quick Access Overlay.
+/// Paths waiting to be shown in the Quick Access Overlay, and the monitor it is anchored to.
 #[derive(Default)]
-struct QuickAccessQueue(Mutex<Vec<String>>);
+struct QuickAccessQueue(Mutex<Vec<String>>, Mutex<Option<tauri::Monitor>>);
 
 /// Single dispatch point for tray, shortcuts, deep links (neatshotx://<action>) and CLI args.
 pub fn run_action(app: &AppHandle, action: &str) {
@@ -27,20 +28,21 @@ pub fn run_action(app: &AppHandle, action: &str) {
             "capture-window" => capture::start_selection(&app, "window"),
             "scrolling-capture" => capture::start_selection(&app, "scroll"),
             "self-timer" => capture::start_selection(&app, "timer"),
-            "capture-fullscreen" => capture::capture_fullscreen(&app),
+            "capture-fullscreen" => capture::capture_fullscreen(&app, None),
             "capture-previous-area" => capture::capture_previous_area(&app),
             "toggle-desktop-icons" => desktop::set_icons_visible(desktop::icons_hidden()).map(|_| tray::refresh(&app)),
             "hide-desktop-icons" => desktop::set_icons_visible(false).map(|_| tray::refresh(&app)),
             "show-desktop-icons" => desktop::set_icons_visible(true).map(|_| tray::refresh(&app)),
             "open-history" | "history" => open_home(&app, "history"),
             "open-settings" | "settings" => open_home(&app, "settings"),
+            "welcome-guide" => open_welcome(&app),
             "annotate" | "open" => pick_image(&app).map(|p| open_editor_window(&app, &p)),
             "pin-image" => pick_image(&app).map(|p| open_pin_window(&app, &p)),
             "open-from-clipboard" => from_clipboard(&app).map(|p| open_editor_window(&app, &p)),
             "restore-recently-closed" => tauri::async_runtime::block_on(capture::list_history(app.clone()))
                 .into_iter()
                 .next()
-                .map(|p| open_quick_access(&app, &p))
+                .map(|i| open_quick_access(&app, &i.path))
                 .ok_or("Nothing to restore".into()),
             "quit" => {
                 app.exit(0);
@@ -49,9 +51,13 @@ pub fn run_action(app: &AppHandle, action: &str) {
             other => Err(format!("Unknown action: {other}")),
         };
         if let Err(e) = res {
-            app.dialog().message(e).kind(MessageDialogKind::Error).title("NeatShotX").show(|_| {});
+            report(&app, e);
         }
     });
+}
+
+pub fn report(app: &AppHandle, e: String) {
+    app.dialog().message(e).kind(MessageDialogKind::Error).title("NeatShotX").show(|_| {});
 }
 
 fn pick_image(app: &AppHandle) -> Result<String, String> {
@@ -84,6 +90,13 @@ fn open_home(app: &AppHandle, tab: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// First-run guide (also reachable from About).
+fn open_welcome(app: &AppHandle) -> Result<(), String> {
+    let w = windows::normal(app, "welcome", "/welcome", "Welcome to NeatShotX", 520.0, 560.0).map_err(|e| e.to_string())?;
+    let _ = w.set_resizable(false);
+    Ok(())
+}
+
 pub fn open_editor_window(app: &AppHandle, path: &str) {
     let label = windows::next_label("editor");
     if let Ok(w) = windows::normal(app, &label, &format!("/editor?p={}", enc(path)), "NeatShotX — Annotate", 1240.0, 800.0) {
@@ -107,14 +120,29 @@ pub fn open_pin_window(app: &AppHandle, path: &str) {
 }
 
 pub fn open_quick_access(app: &AppHandle, path: &str) {
-    app.state::<QuickAccessQueue>().0.lock().unwrap().push(path.to_string());
-    if app.get_webview_window("quick-access").is_some() {
+    let q = app.state::<QuickAccessQueue>();
+    q.0.lock().unwrap().push(path.to_string());
+    *q.1.lock().unwrap() = settings::get(app).qa_follow_active_screen.then(|| monitor_at_cursor(app)).flatten();
+    if let Some(w) = app.get_webview_window("quick-access") {
         let _ = app.emit_to("quick-access", "qa-pending", ());
+        // Re-anchor in case the cursor moved to another screen.
+        if let (Ok(sz), Ok(s)) = (w.inner_size(), w.scale_factor()) {
+            let _ = qa_resize(app.clone(), sz.height as f64 / s);
+        }
         return;
     }
     let _ = windows::overlay(app, "quick-access", "/quick-access").inner_size(QA_W, 200.0).focused(false).build();
     let _ = qa_resize(app.clone(), 200.0);
     watch_qa_pointer(app);
+}
+
+/// The monitor containing the mouse cursor.
+fn monitor_at_cursor(app: &AppHandle) -> Option<tauri::Monitor> {
+    let c = app.cursor_position().ok()?;
+    app.available_monitors().ok()?.into_iter().find(|m| {
+        let (p, s) = (m.position(), m.size());
+        c.x >= p.x as f64 && c.y >= p.y as f64 && c.x < (p.x + s.width as i32) as f64 && c.y < (p.y + s.height as i32) as f64
+    })
 }
 
 const QA_W: f64 = 232.0;
@@ -145,19 +173,27 @@ fn take_pending(app: AppHandle) -> Vec<String> {
     std::mem::take(&mut *app.state::<QuickAccessQueue>().0.lock().unwrap())
 }
 
-/// Keeps the Quick Access Overlay anchored to the bottom-left of the primary screen.
+/// Keeps the Quick Access Overlay anchored to the bottom corner of the active (or primary) screen's work area.
 #[tauri::command]
 fn qa_resize(app: AppHandle, height: f64) -> Result<(), String> {
     let w = app.get_webview_window("quick-access").ok_or("no overlay")?;
-    let m = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("no monitor")?;
+    let anchored = app.state::<QuickAccessQueue>().1.lock().unwrap().clone();
+    let m = match anchored {
+        Some(m) => m,
+        None => app.primary_monitor().map_err(|e| e.to_string())?.ok_or("no monitor")?,
+    };
+    // Physical math on the target monitor's scale: LogicalSize would use the window's current screen.
     let s = m.scale_factor();
     let area = m.work_area(); // excludes Dock / taskbar
-    let (ax, ay, ah) = (area.position.x as f64 / s, area.position.y as f64 / s, area.size.height as f64 / s);
-    let h = height.min(ah - 32.0);
-    w.set_size(LogicalSize::new(QA_W, h)).map_err(|e| e.to_string())?;
-    let x = if settings::get(&app).qa_position == "right" { ax + area.size.width as f64 / s - QA_W - 16.0 } else { ax + 16.0 };
-    w.set_position(LogicalPosition::new(x, ay + ah - h - 16.0))
-        .map_err(|e| e.to_string())
+    let h = (height * s).min(area.size.height as f64 - 32.0 * s);
+    let margin = (16.0 * s) as i32;
+    let size = PhysicalSize::new((QA_W * s) as u32, h as u32);
+    let x = if settings::get(&app).qa_position == "right" { area.position.x + area.size.width as i32 - size.width as i32 - margin } else { area.position.x + margin };
+    let pos = PhysicalPosition::new(x, area.position.y + area.size.height as i32 - size.height as i32 - margin);
+    // Move first so the size is interpreted on the target screen, then settle the origin.
+    w.set_position(pos).map_err(|e| e.to_string())?;
+    w.set_size(size).map_err(|e| e.to_string())?;
+    w.set_position(pos).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -182,21 +218,26 @@ fn platform() -> &'static str {
 
 fn handle_args(app: &AppHandle, args: &[String]) {
     for a in args.iter().skip(1) {
-        let name = a.strip_prefix("neatshotx://").unwrap_or(a).trim_end_matches('/');
-        if tray::is_action(name) || name.starts_with("capture") {
-            run_action(app, name);
-        }
+        link::handle(app, a);
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, args, _| handle_args(app, &args)))
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            // Re-launching with no arguments opens Preferences (the way back in when the menu bar icon is hidden).
+            if args.len() <= 1 {
+                run_action(app, "open-settings");
+            } else {
+                handle_args(app, &args);
+            }
+        }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
@@ -218,12 +259,14 @@ pub fn run() {
             let h = handle.clone();
             app.deep_link().on_open_url(move |e| {
                 for u in e.urls() {
-                    if let Some(host) = u.host_str() {
-                        run_action(&h, host);
-                    }
+                    link::handle(&h, u.as_str());
                 }
             });
             handle_args(&handle, &std::env::args().collect::<Vec<_>>());
+            if !settings::get(&handle).onboarded {
+                let _ = open_welcome(&handle);
+                settings::mark_onboarded(&handle); // shown once even if closed with the window button
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -253,10 +296,14 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building NeatShotX")
-        .run(|_, e| {
+        .run(|app, e| match e {
             // Menu-bar app: keep running when the last window closes.
-            if let RunEvent::ExitRequested { api, code: None, .. } = e {
-                api.prevent_exit();
+            RunEvent::ExitRequested { api, code: None, .. } => api.prevent_exit(),
+            // Launching the app again from Finder/Spotlight while it runs hidden.
+            #[cfg(target_os = "macos")]
+            RunEvent::Reopen { has_visible_windows: false, .. } => run_action(app, "open-settings"),
+            _ => {
+                let _ = app;
             }
         });
 }

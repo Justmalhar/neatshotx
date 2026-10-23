@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "cc-**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LINUX_DEPS: >-
+    libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+    libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev
+    libegl1-mesa-dev libgbm-dev clang
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: src-tauri }
+      - run: sudo apt-get update && sudo apt-get install -y $LINUX_DEPS
+      - run: bun install --frozen-lockfile
+      - run: bunx tsc --noEmit
+      - run: bun src/components/selector/geometry.check.ts
+      - run: bun src/components/editor/background/layout.check.ts
+      - run: bun src/components/editor/snap.check.ts
+      - run: cd src-tauri && cargo test --lib
+
+  build:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: --target universal-apple-darwin
+          - os: windows-latest
+            args: ""
+          - os: ubuntu-22.04
+            args: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: src-tauri }
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y $LINUX_DEPS
+      - run: bun install --frozen-lockfile
+      # Unsigned installers (.dmg/.app, .msi/.exe, .deb/.AppImage/.rpm) as workflow artifacts.
+      - uses: tauri-apps/tauri-action@v0
+        with:
+          tauriScript: bunx tauri
+          args: ${{ matrix.args }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: neatshotx-${{ matrix.os }}
+          path: src-tauri/target/**/release/bundle/**
+          if-no-files-found: warn

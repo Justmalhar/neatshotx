@@ -3,7 +3,7 @@ import Konva from "konva";
 import { Arrow, Circle, Shape as KShape, Ellipse, Group, Image as KImage, Line, Rect, Text } from "react-konva";
 import type { Shape } from "./types";
 import { arrowScene } from "./arrows";
-import { FONT, contrast, fontOf, measure, pill } from "./text";
+import { FONTS, OUTLINE, fontOf, measure, pill, textLook } from "./text";
 
 type Props = {
   s: Shape;
@@ -15,13 +15,14 @@ type Props = {
   onMove: (x: number, y: number) => void;
   onEdit: () => void;
   onDragStart?: () => void;
+  onDragMove?: (node: Konva.Node, evt: MouseEvent) => void;
   /** Called after a Transformer resize; the caller bakes scale into geometry and resets it. */
   onTransform: (node: Konva.Node) => void;
   /** Hidden while its textarea is open. */
   editing?: boolean;
 };
 
-export default function ShapeNode({ s, unit, base, counter, draggable, onSelect, onMove, onEdit, onDragStart, onTransform, editing }: Props) {
+export default function ShapeNode({ s, unit, base, counter, draggable, onSelect, onMove, onEdit, onDragStart, onDragMove, onTransform, editing }: Props) {
   const sw = s.size * unit;
   const common = {
     id: s.id,
@@ -31,6 +32,7 @@ export default function ShapeNode({ s, unit, base, counter, draggable, onSelect,
     onMouseDown: onSelect,
     onTap: onSelect,
     onDragStart,
+    onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => onDragMove?.(e.target, e.evt),
     onTransformEnd: (e: Konva.KonvaEventObject<Event>) => onTransform(e.target),
     onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => onMove(e.target.x(), e.target.y()),
   };
@@ -59,19 +61,23 @@ export default function ShapeNode({ s, unit, base, counter, draggable, onSelect,
         globalCompositeOperation="multiply" />;
     case "text":
     case "emoji": {
-      const fs = fontOf(s, unit);
-      const fx = { text: s.text, fontSize: fs, fontStyle: "bold", fontFamily: FONT };
-      if (s.kind === "text" && s.bg === "solid") {
-        const m = measure(s.text || " ", fs), { px, py, r } = pill(fs);
+      const fs = fontOf(s, unit), family = FONTS[s.font ?? "system"];
+      const fx = { text: s.text, fontSize: fs, fontStyle: "bold", fontFamily: family };
+      const look = textLook(s.kind === "text" ? s.textStyle : "plain", s.color);
+      if (look.pill) {
+        const m = measure(s.text || " ", fs, s.font), { px, py, r } = pill(fs);
         const h = m.h + py * 2;
         return (
           <Group {...common} visible={!editing} onDblClick={onEdit} onDblTap={onEdit}>
-            <Rect width={m.w + px * 2} height={h} fill={s.color} cornerRadius={Math.min(r, h / 2)}
-              shadowColor="black" shadowOpacity={0.25} shadowBlur={4 * unit} shadowOffsetY={1 * unit} />
-            <Text {...fx} x={px} y={py} fill={contrast(s.color)} />
+            <Rect width={m.w + px * 2} height={h} fill={look.bg} cornerRadius={Math.min(r, h / 2)}
+              {...(s.textStyle === "solid" ? { shadowColor: "black", shadowOpacity: 0.25, shadowBlur: 4 * unit, shadowOffsetY: 1 * unit } : {})} />
+            <Text {...fx} x={px} y={py} fill={look.fg} />
           </Group>
         );
       }
+      if (look.stroke)
+        return <Text {...common} {...fx} visible={!editing} fill={look.fg} stroke={look.stroke} strokeWidth={fs * OUTLINE} fillAfterStrokeEnabled
+          lineJoin="round" onDblClick={onEdit} onDblTap={onEdit} />;
       return <Text {...common} {...fx} visible={!editing} fill={s.color} shadowColor="black" shadowOpacity={0.3} shadowBlur={3 * unit}
         onDblClick={onEdit} onDblTap={onEdit} />;
     }

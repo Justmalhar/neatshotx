@@ -16,18 +16,18 @@ const HEADER_H = 32;
 export default function QuickAccess() {
   const [items, setItems] = useState<string[]>([]);
   const [rev, setRev] = useState(0); // cache-bust thumbnails after a file is overwritten
-  const [cfg, setCfg] = useState<Pick<Settings, "qa_position" | "qa_auto_close_secs" | "qa_close_after_drag" | "play_sounds" | "save_after_capture"> | null>(null);
+  const [cfg, setCfg] = useState<Pick<Settings, "qa_position" | "qa_auto_close_secs" | "qa_close_after_drag" | "play_sounds" | "shutter_sound" | "save_after_capture"> | null>(null);
   const seen = useRef(new Set<string>());
-  const sounds = useRef(false);
+  const sounds = useRef<Settings["shutter_sound"] | null>(null);
 
   useEffect(() => {
     let un: Promise<() => void>[] = [];
     api.getSettings().then((s) => {
-      sounds.current = s.play_sounds;
+      sounds.current = s.play_sounds ? s.shutter_sound : null;
       setCfg(s);
       const pull = () => api.takePending().then((p) => {
         if (!p.length) return;
-        if (sounds.current && p.some((x) => !seen.current.has(x))) playShutter();
+        if (sounds.current && p.some((x) => !seen.current.has(x))) playShutter(sounds.current);
         p.forEach((x) => seen.current.add(x));
         setItems((cur) => [...[...p].reverse(), ...cur.filter((c) => !p.includes(c))]);
       });

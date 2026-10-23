@@ -34,7 +34,7 @@ pub const MENU: &[Entry] = &[
 ];
 
 pub fn is_action(name: &str) -> bool {
-    ["open-settings", "hide-desktop-icons", "show-desktop-icons"].contains(&name)
+    ["open-settings", "welcome-guide", "hide-desktop-icons", "show-desktop-icons"].contains(&name)
         || MENU.iter().any(|e| matches!(e, Item { id, .. } if *id == name))
 }
 
@@ -116,6 +116,13 @@ pub fn refresh(app: &AppHandle) {
     }
 }
 
+/// Applies `show_menu_bar_icon`.
+pub fn apply_visibility(app: &AppHandle) {
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = tray.set_visible(settings::get(app).show_menu_bar_icon);
+    }
+}
+
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     TrayIconBuilder::with_id("main")
         .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
@@ -130,5 +137,6 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             }
         })
         .build(app)?;
+    apply_visibility(app);
     Ok(())
 }

@@ -11,6 +11,7 @@ export type KeyHandlers = {
   copy: () => void;
   save: () => void;
   saveAs: () => void;
+  saveProject: () => void;
   done: () => void;
   remove: () => void;
   duplicate: () => void;
@@ -37,6 +38,7 @@ export function useEditorKeys(h: KeyHandlers) {
       const key = e.key.toLowerCase();
       const eat = (f: () => void) => { e.preventDefault(); f(); };
       if (mod) {
+        if (e.altKey && e.code === "KeyS") return eat(k.saveProject);
         if (e.key === "Enter") return eat(k.done);
         if (key === "z") return eat(e.shiftKey ? k.redo : k.undo);
         if (key === "c") return eat(k.copy);

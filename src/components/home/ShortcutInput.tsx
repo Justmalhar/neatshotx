@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 
 const MOD_KEYS = new Set(["Meta", "Control", "Alt", "Shift"]);
 const mac = /Mac|iPhone|iPad/.test(navigator.platform);
-const GLYPH: Record<string, string> = mac
+export const GLYPH: Record<string, string> = mac
   ? { CmdOrCtrl: "⌘", Ctrl: "⌃", Alt: "⌥", Shift: "⇧" }
   : { CmdOrCtrl: "Ctrl", Ctrl: "Ctrl", Alt: "Alt", Shift: "Shift" };
 const order = ["Ctrl", "Alt", "Shift", "CmdOrCtrl"];

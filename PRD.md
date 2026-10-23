@@ -48,3 +48,20 @@ Derived from `Info.plist`, Mach-O strings and bundled resources of `/Application
 - Capture-to-clipboard ≤ 300 ms after mouse-up on a 5K display
 - Zero-crash rate for capture flows across the 3 OS targets in CI smoke tests
 - Installer size < 20 MB
+
+## v0.2 additions
+| Capability | Status |
+|---|---|
+| Automatic scrolling capture (manual fallback) | ✅ |
+| Arrow styles (tapered, standard, curved, double, line-dot, inverse) | ✅ |
+| Text styles (plain, outline, solid, translucent) + fonts | ✅ |
+| Snapping guides while moving/resizing (⌘ disables) | ✅ |
+| Editable projects (`.neatshot`) | ✅ |
+| Window capture with shadow / padding | ✅ |
+| Retina → 1x, WEBP, file-name template, ask for name | ✅ |
+| Shutter sound choice, optional notifications, hide menu-bar icon | ✅ |
+| Quick Access on the active screen | ✅ |
+| URL scheme parameters (`capture-area?x=&y=&width=&height=&display=`, `open-annotate`, `pin`) | ✅ |
+| First-run Welcome / permissions guide | ✅ |
+| CI builds (macOS, Windows, Linux, unsigned) | ✅ workflow added |
+| Auto-update, code signing / notarization | ⏳ needs update host + signing certificates |

@@ -2,7 +2,7 @@ import { Btn, Caption, Section } from "../form";
 import ShortcutInput from "../ShortcutInput";
 import type { PaneProps } from "./types";
 
-const ACTIONS: [string, string][] = [
+export const ACTIONS: [string, string][] = [
   ["capture-fullscreen", "Capture Fullscreen"],
   ["capture-area", "Capture Area"],
   ["capture-window", "Capture Window"],

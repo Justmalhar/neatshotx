@@ -7,6 +7,9 @@ export default function QuickAccess({ s, set }: PaneProps) {
       <Section label="Position:">
         <PopUp label="Position" className="w-28" value={s.qa_position} options={[["left", "Left"], ["right", "Right"]]} onChange={(v) => set("qa_position", v)} />
       </Section>
+      <Section label="Screen:">
+        <Checkbox checked={s.qa_follow_active_screen} onChange={(v) => set("qa_follow_active_screen", v)} caption="Shows the overlay on the screen your cursor is on.">Move to active screen</Checkbox>
+      </Section>
       <Section label="Auto-close:">
         <PopUp label="Auto-close" className="w-28" value={s.qa_auto_close_secs} onChange={(v) => set("qa_auto_close_secs", v)}
           options={[[0, "Never"], [5, "5 seconds"], [10, "10 seconds"], [30, "30 seconds"], [60, "60 seconds"]]} />

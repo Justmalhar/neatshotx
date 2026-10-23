@@ -2,6 +2,9 @@ export type Tool =
   | "select" | "arrow" | "line" | "rect" | "filled" | "ellipse" | "pen" | "highlighter"
   | "text" | "counter" | "pixelate" | "blur" | "spotlight" | "crop" | "emoji";
 
+export type TextStyle = "plain" | "outline" | "solid" | "translucent";
+export type TextFont = "system" | "rounded" | "mono" | "serif";
+
 export type ShapeKind = Exclude<Tool, "select" | "crop">;
 
 /** All coordinates are in base-image pixels; (x, y) is the node offset so drag just moves it. */
@@ -18,7 +21,10 @@ export type Shape = {
   text?: string;
   /** Explicit font size in image px (set after a resize); otherwise derived from `size`. */
   fontSize?: number;
-  /** Text background style. */
+  /** Text look (default "plain"). */
+  textStyle?: TextStyle;
+  font?: TextFont;
+  /** @deprecated pre-textStyle files; migrated by `migrateShape`. */
   bg?: "none" | "solid";
   /** Arrow variants; undefined = "standard". */
   arrowStyle?: "standard" | "tapered" | "curved" | "double" | "line-dot";
@@ -71,3 +77,23 @@ export const norm = (s: Shape): Shape =>
   ["arrow", "line", "pen", "highlighter"].includes(s.kind)
     ? s
     : { ...s, x: Math.min(s.x, s.x + s.w), y: Math.min(s.y, s.y + s.h), w: Math.abs(s.w), h: Math.abs(s.h) };
+
+/** bg:"solid" (old) → textStyle:"solid". */
+export const migrateShape = (s: Shape): Shape => {
+  if (!s.bg) return s;
+  const { bg, ...rest } = s;
+  return bg === "solid" && !rest.textStyle ? { ...rest, textStyle: "solid" } : rest;
+};
+
+/** On-disk `.neatshot` project (JSON). */
+export type Project = {
+  format: "neatshot";
+  version: 1;
+  base: string;
+  original: string;
+  shapes: Shape[];
+  background: Background;
+  counterStart: number;
+  arrowDefaults?: { arrowStyle: Shape["arrowStyle"]; arrowInverse: boolean };
+  textDefaults?: { textStyle: TextStyle; font: TextFont };
+};
