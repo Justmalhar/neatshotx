@@ -11,17 +11,14 @@ export default function StackHeader({ onCloseAll, onSaveAll }: { onCloseAll: () 
   };
   return (
     <motion.div {...materialize} transition={spring.ui} layout
-      className="mat-hud mx-auto flex h-8 shrink-0 items-center gap-0.5 rounded-full p-0.5 text-xs font-medium">
-      <Pill onClick={onCloseAll}><X size={12} />Close All</Pill>
-      <span className="h-3.5 w-px bg-white/20" />
-      <Pill onClick={save}>{saved ? <><Check size={12} />Saved {saved}</> : <><Download size={12} />Save All</>}</Pill>
+      className="hud mx-auto flex h-8 shrink-0 items-center gap-1 rounded-full p-1">
+      <Pill onClick={onCloseAll}><X size={12} strokeWidth={1.75} />Close All</Pill>
+      <span className="h-3 w-px" style={{ background: "var(--hud-fg-2)", opacity: 0.4 }} />
+      <Pill onClick={save}>{saved ? <><Check size={12} strokeWidth={1.75} />Saved {saved}</> : <><Download size={12} strokeWidth={1.75} />Save All</>}</Pill>
     </motion.div>
   );
 }
 
 function Pill(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <motion.button whileTap={{ scale: 0.94 }} transition={spring.press} {...(props as object)}
-      className="flex h-7 items-center gap-1.5 rounded-full px-3 text-white/90 hover:bg-white/15 hover:text-white" />
-  );
+  return <button type="button" {...props} className="hud-btn t-body !h-6 !bg-transparent px-3 hover:!bg-white/15" />;
 }

@@ -1,3 +1,4 @@
+import { resolveColor } from "../ui/color";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Konva from "konva";
 import { Group, Image as KImage, Layer, Line, Shape as KShape, Stage, Transformer } from "react-konva";
@@ -6,7 +7,7 @@ import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, fileName, param } from "../lib/api";
-import { materialize, spring } from "../lib/motion";
+import { spring } from "../lib/motion";
 import { DEFAULT_CURVE } from "../components/editor/arrows";
 import ShapeNode from "../components/editor/ShapeNode";
 import BackgroundPanel from "../components/editor/BackgroundPanel";
@@ -41,6 +42,7 @@ function useImage(src: string) {
 }
 
 export default function Editor() {
+  const accent = useMemo(() => resolveColor("var(--accent)"), []); // system accent for canvas UI
   const path = param("p") ?? "";
   const [doc, setDoc] = useState<Doc>({ base: "", shapes: [] });
   const [original, setOriginal] = useState("");
@@ -415,7 +417,7 @@ export default function Editor() {
               <div className="relative m-auto shrink-0" style={{ width: W * scale, height: H * scale }}>
                 <Stage ref={stageRef} width={W * scale} height={H * scale} scaleX={scale} scaleY={scale}
                   onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp}
-                  style={{ cursor: tool === "select" ? "default" : "crosshair", boxShadow: bg.kind === "none" ? "0 2px 18px rgba(0,0,0,.10), 0 0 0 0.5px rgba(0,0,0,.08)" : "none", borderRadius: bg.kind === "none" ? 2 : 0 }}>
+                  style={{ cursor: tool === "select" ? "default" : "crosshair", boxShadow: bg.kind === "none" ? "var(--shadow-md)" : "none", borderRadius: bg.kind === "none" ? 2 : 0 }}>
                   <Layer>
                     <Backdrop bg={bg} layout={layout} img={img} />
                     <Group ref={groupRef} x={ox} y={oy} clipFunc={groupClip(layout)}>
@@ -455,13 +457,13 @@ export default function Editor() {
                   <Layer ref={overlayRef}>
                     <Transformer ref={trRef} rotateEnabled={false} flipEnabled={false} resizeEnabled={resizable}
                       enabledAnchors={resizable ? (keepRatio ? CORNERS : undefined) : []} keepRatio={keepRatio}
-                      borderStroke="#0a84ff" borderStrokeWidth={1.5} anchorSize={9} anchorCornerRadius={5} anchorStroke="#0a84ff"
+                      borderStroke={accent} borderStrokeWidth={1.5} anchorSize={9} anchorCornerRadius={5} anchorStroke={accent}
                       anchorFill="#fff" anchorStrokeWidth={1.5} padding={2}
                       boundBoxFunc={snapResize}
                       onTransformStart={() => sel && startSnap(sel.id)} onTransformEnd={() => setGuides([])} />
                     <Group x={ox} y={oy}>
                       {guides.map((g, i) => (
-                        <Line key={i} name="ui" listening={false} stroke="#0a84ff" strokeWidth={1 / scale} strokeScaleEnabled
+                        <Line key={i} name="ui" listening={false} stroke={accent} strokeWidth={1 / scale} strokeScaleEnabled
                           points={g.o === "v" ? [g.pos, g.from, g.pos, g.to] : [g.from, g.pos, g.to, g.pos]} />
                       ))}
                       {sel && linear && !moving && !editing && (
@@ -489,9 +491,10 @@ export default function Editor() {
 
           <AnimatePresence>
             {crop && tool === "crop" && (
-              <motion.div {...materialize} transition={spring.ui} className="mat-hud absolute bottom-12 left-1/2 flex -translate-x-1/2 gap-1 rounded-full p-1">
-                <button className="btn rounded-full hover:bg-white/15" onClick={() => setCrop(null)}>Cancel</button>
-                <button className="btn btn-primary rounded-full" onClick={applyCrop}>Apply Crop</button>
+              <motion.div initial={{ opacity: 0, y: 8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={spring.ui} className="hud absolute bottom-12 left-1/2 z-30 flex gap-1 rounded-full p-1" style={{ x: "-50%" }}>
+                <button className="hud-btn" onClick={() => setCrop(null)}>Cancel</button>
+                <button className="hud-btn hud-btn--primary" onClick={applyCrop}>Apply Crop</button>
               </motion.div>
             )}
           </AnimatePresence>

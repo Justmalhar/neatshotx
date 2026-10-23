@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
-import { fileSrc, param } from "../lib/api";
-import { IconButton } from "../components/overlays/IconButton";
+import { api, fileSrc, param } from "../lib/api";
+import { nativeMenu } from "../ui/menu";
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -46,6 +46,18 @@ export default function Pin() {
     } finally { busy.current = false; }
   };
 
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    nativeMenu([
+      { label: "Copy", action: () => api.copyImage(path).catch(() => {}) },
+      { label: "Annotate", action: () => { api.openEditor(path); close(); } },
+      "separator",
+      ...[100, 75, 50, 25].map((v) => ({ label: `Opacity ${v}%`, checked: Math.round(opacity * 100) === v, action: () => setOpacity(v / 100) })),
+      "separator",
+      { label: "Close", action: close },
+    ]);
+  };
+
   const onWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) { // pinch arrives as wheel + ctrlKey
       target.current = clamp(target.current * Math.exp(-e.deltaY * (e.ctrlKey && !e.metaKey ? 0.01 : 0.003)), 0.2, 5);
@@ -62,20 +74,21 @@ export default function Pin() {
       onMouseDown={(e) => e.button === 0 && e.detail === 1 && win.current.startDragging()}
       onDoubleClick={close}
       onWheel={onWheel}
+      onContextMenu={onContextMenu}
       tabIndex={0}
     >
       <img src={fileSrc(path)} style={{ opacity }} className="pointer-events-none h-full w-full object-contain" draggable={false} />
       <AnimatePresence>
         {hover && (
           <motion.div
-            className="mat-hud absolute inset-x-1.5 top-1.5 flex h-8 items-center gap-1 rounded-full px-1 text-[11px] font-medium"
+            className="hud absolute inset-x-1.5 top-1.5 flex h-8 items-center gap-1 rounded-full px-1"
             initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
             transition={{ type: "spring", bounce: 0, duration: 0.25 }}
             onMouseDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}
           >
-            <IconButton label="Close (Esc)" onClick={close} className="!h-6 !w-6"><X size={13} /></IconButton>
-            <span className="tabular ml-auto text-white/80" title="Scroll to change opacity">{Math.round(opacity * 100)}% opacity</span>
-            <span className="tabular mr-2 text-white/80" title="Cmd/Ctrl + scroll or pinch to zoom">{Math.round(zoom * 100)}%</span>
+            <button type="button" className="hud-btn hud-btn--icon !h-6 !w-6 !min-w-6" title="Close (Esc)" onClick={close}><X size={12} strokeWidth={1.75} /></button>
+            <span className="t-caption tabular ml-auto" style={{ color: "var(--hud-fg-2)" }} title="Scroll to change opacity">{Math.round(opacity * 100)}% opacity</span>
+            <span className="t-caption tabular mr-2" style={{ color: "var(--hud-fg-2)" }} title="Cmd/Ctrl + scroll or pinch to zoom">{Math.round(zoom * 100)}%</span>
           </motion.div>
         )}
       </AnimatePresence>

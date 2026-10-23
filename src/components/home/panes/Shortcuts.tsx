@@ -1,4 +1,4 @@
-import { Btn, Caption, Section } from "../form";
+import { Caption, Row, Section } from "../form";
 import ShortcutInput from "../ShortcutInput";
 import type { PaneProps } from "./types";
 
@@ -16,14 +16,14 @@ export default function Shortcuts({ s, set }: PaneProps) {
   return (
     <>
       {ACTIONS.map(([k, label]) => (
-        <div key={k} className="grid grid-cols-[200px_1fr] items-center gap-x-3 py-1.5">
-          <div className="text-right font-medium">{label}:</div>
+        <Row key={k} label={`${label}:`}>
           <ShortcutInput value={s.shortcuts[k] ?? ""} onChange={(v) => set("shortcuts", { ...s.shortcuts, [k]: v })} />
-        </div>
+        </Row>
       ))}
+      <div className="mt-3" />
       <Section>
         <Caption>Click a field and press a combination. Backspace clears it.</Caption>
-        <Btn onClick={restore}>Restore Defaults</Btn>
+        <button className="ns-btn" onClick={restore}>Restore Defaults</button>
       </Section>
     </>
   );

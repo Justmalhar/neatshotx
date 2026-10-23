@@ -31,8 +31,11 @@ class Boundary extends Component<{ children: ReactNode }, { error?: Error }> {
     const e = this.state.error;
     if (!e) return this.props.children;
     return (
-      <div className="mat-regular m-4 rounded-[var(--r-lg)] p-4 text-xs select-text">
-        <div className="t-headline mb-1">Something went wrong</div>
+      <div className="ns-group t-callout m-4 p-4 select-text">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="t-headline">Something went wrong</span>
+          <button className="ns-btn" onClick={() => location.reload()}>Reload</button>
+        </div>
         <pre className="whitespace-pre-wrap font-mono opacity-80">{e.message}{"\n"}{e.stack}</pre>
       </div>
     );

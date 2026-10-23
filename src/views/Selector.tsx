@@ -185,11 +185,11 @@ export default function Selector() {
         {hl && (
           <div
             className="pointer-events-none absolute"
-            style={{ left: snap(hl.x), top: snap(hl.y), width: snap(hl.w), height: snap(hl.h), background: "rgba(10,132,255,.18)", boxShadow: "inset 0 0 0 2px #0A84FF" }}
+            style={{ left: snap(hl.x), top: snap(hl.y), width: snap(hl.w), height: snap(hl.h), background: "color-mix(in srgb, var(--accent) 18%, transparent)", boxShadow: "inset 0 0 0 2px var(--accent)" }}
           />
         )}
         {hl && hovered && (
-          <div className="mat-hud t-caption tabular pointer-events-none absolute rounded-md px-2 py-0.5 font-medium" style={{ left: Math.round(hl.x), top: Math.round(tagTop), color: "#fff" }}>
+          <div className="hud t-caption tabular pointer-events-none absolute rounded-full px-2.5 py-0.5 backdrop-blur-xl" style={{ left: Math.round(hl.x), top: Math.round(tagTop), color: "var(--hud-fg)" }}>
             {hovered.app} · {Math.round(hl.w * scale)} × {Math.round(hl.h * scale)}
           </div>
         )}
@@ -202,8 +202,8 @@ export default function Selector() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={spring.ui}
-                className="mat-hud t-caption tabular rounded-md px-2 py-1 font-medium"
-                style={{ color: "#fff", fontSize: 12, transformOrigin: flipX ? "right top" : "left top" }}
+                className="hud t-caption tabular rounded-full px-2.5 py-1 backdrop-blur-xl"
+                style={{ color: "var(--hud-fg)", transformOrigin: flipX ? "right top" : "left top" }}
               >
                 {Math.round(sel.w * scale)} × {Math.round(sel.h * scale)}
               </motion.div>
@@ -233,8 +233,8 @@ export default function Selector() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={spring.ui}
-              className="mat-hud t-caption pointer-events-none absolute top-8 rounded-full px-4 py-2 font-medium"
-              style={{ color: "#fff", x: "-50%", left: "50%" }}
+              className="hud t-caption pointer-events-none absolute top-8 rounded-full px-4 py-2 backdrop-blur-xl"
+              style={{ color: "var(--hud-fg)", x: "-50%", left: "50%" }}
             >
               {MODE_HINT[mode]}
             </motion.div>

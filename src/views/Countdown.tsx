@@ -3,7 +3,6 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { api, param } from "../lib/api";
 import { ProgressRing } from "../components/overlays/ProgressRing";
 import { tick } from "../components/overlays/tick";
-import { materialize } from "../lib/motion";
 
 export default function Countdown() {
   const reduce = useReducedMotion();
@@ -19,14 +18,9 @@ export default function Countdown() {
   useEffect(() => { if (sound && n > 0) tick(n === total ? 880 : 1000); }, [n, sound, total]);
 
   return (
-    <div className="grid h-full place-items-center">
-      <motion.div
-        className="mat-hud relative grid h-40 w-40 place-items-center rounded-full"
-        initial={reduce ? { opacity: 0 } : materialize.initial}
-        animate={reduce ? { opacity: 1 } : materialize.animate}
-        transition={{ type: "spring", bounce: 0, duration: 0.35 }}
-      >
-        <ProgressRing size={160} progress={Math.max(0, n - 1) / total} />
+    // Window is the material (native vibrancy, 144x144, radius 72): no blur/shadow of our own.
+    <div className="hud hud--window relative grid h-full w-full select-none place-items-center overflow-hidden rounded-full">
+      <ProgressRing size={144} progress={Math.max(0, n - 1) / total} />
         <AnimatePresence mode="popLayout">
           <motion.span
             key={n}
@@ -34,10 +28,11 @@ export default function Countdown() {
             animate={{ scale: 1, opacity: 1 }}
             exit={reduce ? { opacity: 0 } : { scale: 0.6, opacity: 0 }}
             transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
-            className="tabular text-[72px] font-semibold leading-none tracking-tight"
+            // Single explicit size: the numeral is a display glyph outside the type scale.
+            style={{ fontSize: 64, color: "var(--hud-fg)" }}
+            className="tabular font-semibold leading-none tracking-tight"
           >{n}</motion.span>
         </AnimatePresence>
-      </motion.div>
     </div>
   );
 }

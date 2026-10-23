@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Check } from "lucide-react";
-import { materialize, spring } from "../../lib/motion";
+import { spring } from "../../lib/motion";
 
 type Align = "start" | "center" | "end";
 const ORIGIN: Record<Align, string> = { start: "left", center: "center", end: "right" };
 const POS: Record<Align, string> = { start: "left-0", center: "left-1/2 -translate-x-1/2", end: "right-0" };
 
-/** Popover that materializes from its trigger (transform-origin) and dismisses on outside press / Esc. */
-export default function Popover({ trigger, children, align = "center", up }: {
+/** Custom-content popover (swatches, styles, emoji). Grows from its trigger; closes on outside press / Esc. */
+export default function Popover({ trigger, children, align = "center" }: {
   trigger: (p: { open: boolean; toggle: () => void }) => ReactNode;
   children: ReactNode | ((close: () => void) => ReactNode);
   align?: Align;
-  /** Open above the trigger (bottom bar). */
-  up?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -31,24 +28,15 @@ export default function Popover({ trigger, children, align = "center", up }: {
       {trigger({ open, toggle: () => setOpen((o) => !o) })}
       <AnimatePresence>
         {open && (
-          <div className={`absolute z-50 ${up ? "bottom-full mb-2" : "top-full mt-2"} ${POS[align]}`}>
-            <motion.div {...materialize} transition={spring.ui} style={{ transformOrigin: `${up ? "bottom" : "top"} ${ORIGIN[align]}` }}
-              className="mat-regular rounded-[var(--r-lg)] p-2">
+          <div className={`absolute top-full z-50 mt-2 ${POS[align]}`}>
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              transition={spring.ui} style={{ transformOrigin: `top ${ORIGIN[align]}`, background: "var(--bg-content)", boxShadow: "var(--shadow-md), inset 0 0 0 0.5px var(--separator)" }}
+              className="rounded-[var(--r-md)] p-2">
               {typeof children === "function" ? children(close) : children}
             </motion.div>
           </div>
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-export function MenuItem({ label, kbd, checked, onClick }: { label: string; kbd?: string; checked?: boolean; onClick: () => void }) {
-  return (
-    <button className="btn w-full min-w-[180px] justify-start gap-2 !px-2 text-left" onClick={onClick}>
-      <span className="grid w-3.5 place-items-center">{checked && <Check size={12} />}</span>
-      <span className="flex-1">{label}</span>
-      {kbd && <span className="t-caption tabular">{kbd}</span>}
-    </button>
   );
 }

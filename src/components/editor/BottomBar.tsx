@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { GripHorizontal, Pin, Share, Copy } from "lucide-react";
 import ZoomMenu from "./ZoomMenu";
-import { CapButton, ICON, cap } from "./IconButton";
+import { CapButton, ICON } from "./IconButton";
 import type { Zoom } from "./useZoom";
 
 type Props = {
@@ -30,14 +30,14 @@ export default function BottomBar(p: Props) {
       style={{ background: "var(--bg-window)", borderTop: "0.5px solid var(--separator)" }}>
       <ZoomMenu zoom={p.zoom} canRevert={p.canRevert} revert={p.revert} />
       <div className="flex-1" />
-      <button className={cap + " cursor-grab gap-2 px-4 select-none " + (pressed ? "!scale-95 !cursor-grabbing !bg-[var(--fill-2)]" : "")}
-        aria-label="Drag me" onPointerDown={drag}>
-        <GripHorizontal size={16} strokeWidth={2.25} className="text-[var(--label-2)]" />Drag Me<GripHorizontal size={16} strokeWidth={2.25} className="text-[var(--label-2)]" />
+      <button className={"ns-capsule shrink-0 cursor-grab select-none px-4 " + (pressed ? "!cursor-grabbing !bg-[var(--fill-2)]" : "")}
+        title="Drag the image into another app" aria-label="Drag me" onPointerDown={drag}>
+        <GripHorizontal {...ICON} className="text-[var(--label-2)]" />Drag Me<GripHorizontal {...ICON} className="text-[var(--label-2)]" />
       </button>
       <div className="flex flex-1 justify-end gap-2">
-        <CapButton round side="top" icon={<Share {...ICON} size={16} />} label="Show in Finder" onClick={p.share} />
-        <CapButton round side="top" icon={<Pin {...ICON} size={16} />} label="Pin to screen" onClick={p.pin} />
-        <CapButton round side="top" icon={<Copy {...ICON} size={16} />} label="Copy" kbd="⌘C" onClick={p.copy} />
+        <CapButton icon={<Share {...ICON} />} label="Show in Finder" onClick={p.share} />
+        <CapButton icon={<Pin {...ICON} />} label="Pin to screen" onClick={p.pin} />
+        <CapButton icon={<Copy {...ICON} />} label="Copy" title="Copy (⌘C)" onClick={p.copy} />
       </div>
     </footer>
   );

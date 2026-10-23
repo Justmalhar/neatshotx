@@ -59,10 +59,10 @@ export default function Loupe({ cursor, img, src, scale }: { cursor: Pt; img: Re
         <div className="absolute left-0 h-px w-full" style={{ top: c - 0.5, background: LINE }} />
         <div className="absolute" style={{ left: c - ZOOM / 2, top: c - ZOOM / 2, width: ZOOM, height: ZOOM, boxShadow: "inset 0 0 0 1px #fff, 0 0 0 1px rgba(0,0,0,.7)" }} />
       </div>
-      <div className="mat-hud tabular flex flex-col items-center rounded-lg px-2.5 py-1 leading-tight" style={{ color: "#fff" }}>
-        <span className="tabular text-[11px] font-semibold text-white">x: {px}&nbsp;&nbsp;y: {py}</span>
+      <div className="hud tabular flex flex-col items-center px-2.5 py-1 backdrop-blur-xl" style={{ borderRadius: "var(--r-md)" }}>
+        <span className="t-caption tabular font-semibold" style={{ color: "var(--hud-fg)" }}>x: {px}&nbsp;&nbsp;y: {py}</span>
         {color && (
-          <span className="flex items-center gap-1 text-[10px] opacity-70">
+          <span className="t-caption flex items-center gap-1" style={{ color: "var(--hud-fg-2)" }}>
             <span className="h-2 w-2 rounded-full" style={{ background: color, boxShadow: "0 0 0 0.5px rgba(255,255,255,.5)" }} />
             {color}
           </span>

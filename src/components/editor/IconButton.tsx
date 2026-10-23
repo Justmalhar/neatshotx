@@ -1,29 +1,17 @@
 import type { ReactNode } from "react";
-import Tip from "./Tip";
 
-/** CleanShot-style capsule: white pill, soft shadow, 32px tall. Press feedback is instant. */
-export const cap =
-  "inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full bg-[var(--bg-content)] text-[13px] font-medium text-[var(--label)] " +
-  "shadow-[var(--shadow-sm)] transition-[background-color,transform,opacity] duration-100 hover:bg-[color-mix(in_srgb,var(--bg-content)_88%,var(--label))] " +
-  "active:scale-95 disabled:pointer-events-none disabled:opacity-35 " +
-  "focus-visible:outline-[3px] focus-visible:outline-[color-mix(in_srgb,var(--accent)_45%,transparent)]";
-export const capIcon = cap + " w-10";
-export const capOn = "!bg-[var(--accent)] !text-white";
-export const capPrimary = cap + " px-4 !bg-[var(--accent)] !text-white hover:!bg-[color-mix(in_srgb,var(--accent)_88%,black)]";
-
-export const ICON = { size: 18, strokeWidth: 2.25 } as const;
+/** Lucide props for editor chrome: 16px, 1.75 stroke (DESIGN-SYSTEM.md). */
+export const ICON = { size: 16, strokeWidth: 1.75 } as const;
+export const CHEVRON = { size: 14, strokeWidth: 1.75, className: "opacity-60" } as const;
 
 /** 0.5px hairline between tool groups; doubles as a drag handle. */
 export const Sep = () => <span data-tauri-drag-region className="mx-0.5 h-4 w-[0.5px] shrink-0 bg-[var(--separator)]" />;
 
-export function CapButton({ icon, label, kbd, onClick, disabled, active, side, align, round }: {
-  icon: ReactNode; label: string; kbd?: string; onClick: () => void; disabled?: boolean; active?: boolean;
-  side?: "bottom" | "top"; align?: "center" | "end"; round?: boolean;
+/** Icon-only capsule: adds the native tooltip + aria label to `.ns-capsule--icon`. */
+export function CapButton({ icon, label, title, onClick, active }: {
+  icon: ReactNode; label: string; title?: string; onClick: () => void; active?: boolean;
 }) {
   return (
-    <Tip label={label} kbd={kbd} side={side} align={align}>
-      <button className={(round ? cap + " w-8" : capIcon) + (active ? " " + capOn : "")} aria-label={label} aria-pressed={active}
-        disabled={disabled} onClick={onClick}>{icon}</button>
-    </Tip>
+    <button className="ns-capsule ns-capsule--icon shrink-0" title={title ?? label} aria-label={label} aria-pressed={active} onClick={onClick}>{icon}</button>
   );
 }

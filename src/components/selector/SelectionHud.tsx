@@ -31,23 +31,23 @@ export default function SelectionHud({ rect, scale, mode, ratio, onRatio, onConf
       <motion.div
         {...materialize}
         transition={spring.ui}
-        className="mat-hud flex items-center gap-1 rounded-full p-1 pl-3"
+        className="hud flex items-center gap-1 rounded-full p-1 pl-3 backdrop-blur-xl backdrop-saturate-150"
         style={{ height: HUD_H }}
       >
-        <span className="t-caption tabular mr-1 min-w-[84px] text-center font-medium" style={{ color: "#fff" }}>
+        <span className="t-caption tabular mr-1 min-w-24 text-center" style={{ color: "var(--hud-fg)" }}>
           {Math.round(rect.w * scale)} × {Math.round(rect.h * scale)}
         </span>
         {PRESETS.map((p) => (
-          <button key={p.label} className="btn !h-6 !px-2 !text-[12px] hover:bg-white/15!" data-active={ratio === p.ratio} onClick={() => onRatio(p.ratio)}>
+          <button key={p.label} className="hud-btn t-caption !h-6 !bg-transparent !px-2 hover:!bg-white/15 data-[active=true]:!bg-white/25" style={{ color: "var(--hud-fg)" }} data-active={ratio === p.ratio} onClick={() => onRatio(p.ratio)}>
             {p.label}
           </button>
         ))}
-        <div className="mx-1 h-4 w-px bg-white/20" />
-        <button className="btn btn-icon hover:bg-white/15!" aria-label="Cancel" onClick={onCancel}>
-          <X size={15} />
+        <div className="mx-1 h-4 w-px" style={{ background: "var(--hud-fg-2)", opacity: 0.4 }} />
+        <button className="hud-btn hud-btn--icon !bg-transparent hover:!bg-white/15" title="Cancel (Esc)" aria-label="Cancel" onClick={onCancel}>
+          <X size={14} strokeWidth={1.75} />
         </button>
-        <button className="btn btn-primary !h-7 rounded-full !px-3" onClick={onConfirm}>
-          <Check size={14} strokeWidth={2.5} /> {CONFIRM[mode] ?? "Capture"}
+        <button className="hud-btn hud-btn--primary t-body font-semibold" onClick={onConfirm}>
+          <Check size={14} strokeWidth={1.75} /> {CONFIRM[mode] ?? "Capture"}
         </button>
       </motion.div>
     </div>

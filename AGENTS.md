@@ -16,3 +16,11 @@
 - Disk on the dev machine can be tight: dev profile has `debug = 0`. Don't re-enable without checking free space.
 - Tests: `cd src-tauri && cargo test --lib` (scroll stitcher). Frontend: `bunx tsc --noEmit`.
 - Recording, OCR and cloud upload were removed on purpose (install/permission burden). Don't reintroduce ffmpeg or network deps without asking.
+- UI must follow DESIGN-SYSTEM.md: native controls first (`.ns-check/.ns-select/.ns-range/.ns-field`, `title` tooltips,
+  `nativeMenu()` from `src/ui/menu.ts` for command menus), `.ns-btn/.ns-tool/.ns-capsule/.hud*` classes, `.t-*` type
+  classes only, `--r-*` radius tokens only, lucide icons at strokeWidth 1.75. No arbitrary `text-[Npx]`, no new button components.
+- Konva can't read CSS variables: resolve theme colors with `resolveColor()` from `src/ui/color.ts`.
+- Overlay windows that should look translucent get native vibrancy in Rust (`windows::hud_effects`) and use `.hud .hud--window`;
+  CSS backdrop-filter can't blur the desktop behind a transparent window.
+- New `@tauri-apps/api/*` imports must be added to `optimizeDeps.include` in vite.config.ts, or open dev windows hit
+  504 "Outdated Optimize Dep" ("Importing a module script failed").

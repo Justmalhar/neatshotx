@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { motion } from "motion/react";
+import { nativeMenu } from "../../ui/menu";
 import { Copy, FolderOpen, Image as ImageIcon, Pencil, Pin, Trash2 } from "lucide-react";
 import { api, fileName, fileSrc, type HistoryItem } from "../../lib/api";
-import { spring } from "../../lib/motion";
-import { Btn, PopUp } from "./form";
+import { Select } from "./form";
 import type { PaneProps } from "./panes/types";
 
+const mac = /Mac/.test(navigator.userAgent);
 const KEEP: [number, string][] = [[0, "Forever"], [1, "1 day"], [7, "1 week"], [30, "1 month"], [90, "3 months"]];
 
 /** Capture time: parsed from the default "… 2025-01-31 at 14.05.09" name, else the file's mtime (custom templates). */
@@ -53,22 +53,20 @@ export default function History({ s, set }: PaneProps) {
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--separator)] pb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--separator)] pb-4">
+        <span className="t-caption">{items.length === 1 ? "1 capture" : `${items.length} captures`}</span>
         <div className="flex items-center gap-2">
-          <span className="t-caption">{items.length === 1 ? "1 capture" : `${items.length} captures`}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium">Keep history:</span>
-          <PopUp label="Keep history" className="w-28" value={s.history_keep_days} onChange={(v) => set("history_keep_days", v)} options={KEEP} />
-          <Btn className="!text-[var(--danger)]" disabled={!items.length} onClick={clear}>Clear History…</Btn>
+          <span className="t-body">Keep history:</span>
+          <Select label="Keep history" value={s.history_keep_days} onChange={(v) => set("history_keep_days", v)} options={KEEP} />
+          <button className="ns-btn ns-btn--destructive" disabled={!items.length} onClick={clear}>Clear History…</button>
         </div>
       </div>
 
       {!items.length ? (
         <div className="grid place-items-center gap-2 py-20 text-center">
-          <ImageIcon size={56} strokeWidth={1.25} className="text-[var(--label-3)]" />
-          <h2 className="t-title mt-2">{items.length ? "Nothing here" : "No captures yet"}</h2>
-          <p className="t-callout max-w-xs">{"Press ⌥⇧2 to capture an area, or use the menu bar icon."}</p>
+          <ImageIcon size={32} strokeWidth={1.75} className="text-[var(--label-3)]" />
+          <h2 className="t-title mt-2">No captures yet</h2>
+          <p className="t-callout max-w-xs">Press ⌥⇧2 to capture an area, or use the menu bar icon.</p>
         </div>
       ) : groups.map((g) => (
         <section key={g.label} className="mb-6">
@@ -85,24 +83,38 @@ export default function History({ s, set }: PaneProps) {
 function Card({ it, rev, onDeleted }: { it: HistoryItem; rev: number; onDeleted: () => void }) {
   const p = it.path;
   const d = stamp(it);
+  const del = () => api.deleteCapture(p).then(onDeleted);
+  const menu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    nativeMenu([
+      { label: "Annotate", action: () => api.openEditor(p) },
+      { label: "Copy", action: () => api.copyImage(p) },
+      { label: "Pin", action: () => api.openPin(p) },
+      { label: mac ? "Show in Finder" : "Show in Folder", action: () => revealItemInDir(p) },
+      "separator",
+      { label: "Delete", action: del },
+    ]);
+  };
   return (
-    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.99 }} transition={spring.ui} className="group" title={fileName(p)}
-      onDoubleClick={() => api.openEditor(p)}>
-      <div className="relative aspect-video overflow-hidden rounded-xl bg-[var(--fill)] shadow-[var(--shadow-sm)]">
+    <div className="group" title={fileName(p)} onDoubleClick={() => api.openEditor(p)} onContextMenu={menu}>
+      <div tabIndex={0} style={{ borderRadius: "var(--r-md)" }}
+        className="relative aspect-video overflow-hidden bg-[var(--fill)] shadow-[0_0_0_0.5px_var(--separator)]">
         <img src={`${fileSrc(p)}?v=${rev}`} className="h-full w-full object-cover" loading="lazy" draggable={false} />
-        <div className="mat-hud absolute inset-x-2 bottom-2 flex translate-y-1 justify-center gap-0.5 rounded-full p-1 opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          <A t="Annotate" on={() => api.openEditor(p)}><Pencil size={14} /></A>
-          <A t="Copy" on={() => api.copyImage(p)}><Copy size={14} /></A>
-          <A t="Pin" on={() => api.openPin(p)}><Pin size={14} /></A>
-          <A t="Show in folder" on={() => revealItemInDir(p)}><FolderOpen size={14} /></A>
-          <A t="Delete" on={() => api.deleteCapture(p).then(onDeleted)}><Trash2 size={14} /></A>
+        <div className="absolute inset-x-0 bottom-2 flex justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+          <div className="flex gap-0.5 rounded-[var(--r-full)] bg-[var(--bg-content)] p-0.5 shadow-[0_0_0_0.5px_var(--separator),var(--shadow-sm)]">
+            <A t="Annotate" on={() => api.openEditor(p)}><Pencil size={16} strokeWidth={1.75} /></A>
+            <A t="Copy" on={() => api.copyImage(p)}><Copy size={16} strokeWidth={1.75} /></A>
+            <A t="Pin" on={() => api.openPin(p)}><Pin size={16} strokeWidth={1.75} /></A>
+            <A t={mac ? "Show in Finder" : "Show in Folder"} on={() => revealItemInDir(p)}><FolderOpen size={16} strokeWidth={1.75} /></A>
+            <A t="Delete" on={del}><Trash2 size={16} strokeWidth={1.75} /></A>
+          </div>
         </div>
       </div>
-      <div className="t-caption truncate px-1 pt-1.5">{d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</div>
-    </motion.div>
+      <div className="t-caption truncate px-1 pt-1">{d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</div>
+    </div>
   );
 }
 
 function A({ t, on, children }: { t: string; on: () => void; children: React.ReactNode }) {
-  return <button title={t} aria-label={t} onClick={(e) => { e.stopPropagation(); on(); }} className="grid h-7 w-7 place-items-center rounded-full text-white transition hover:bg-white/20 active:scale-90">{children}</button>;
+  return <button title={t} aria-label={t} onClick={(e) => { e.stopPropagation(); on(); }} className="ns-tool !rounded-[var(--r-full)]">{children}</button>;
 }
