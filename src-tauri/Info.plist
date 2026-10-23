@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>LSUIElement</key><true/>
+  <key>NSCameraUsageDescription</key><string>NeatShotX uses the camera only for the webcam overlay during recordings.</string>
+  <key>NSMicrophoneUsageDescription</key><string>NeatShotX records your microphone only during recordings.</string>
+</dict>
+</plist>

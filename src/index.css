@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-shadow: 0 10px 40px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --fg: #111318;
+  --muted: #5d6270;
+  --accent: #3b82f6;
+  --surface: #f4f5f8;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-bg: rgba(30, 31, 38, 0.66);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-shadow: 0 10px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --fg: #f2f3f7;
+    --muted: #9aa0ad;
+    --surface: #15161b;
+  }
+}
+
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", Inter, Ubuntu, sans-serif;
+  color: var(--fg);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.transparent { background: transparent; }
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 10px; padding: 6px 10px; font-size: 13px; font-weight: 500;
+  transition: background 120ms, transform 120ms;
+}
+.btn:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); }
+.btn:active { transform: scale(0.96); }
+.btn[data-active="true"] { background: var(--accent); color: white; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
+.input {
+  border-radius: 8px; padding: 6px 10px; font-size: 13px;
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  outline: none; user-select: text; -webkit-user-select: text;
+}
+.input:focus { border-color: var(--accent); }
+.muted { color: var(--muted); }
