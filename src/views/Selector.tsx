@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, param, type WindowRect } from "../lib/api";
-
-type Pt = { x: number; y: number };
-const LOUPE = 128;
-const ZOOM = 8;
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { api, param, type Region, type Settings, type WindowRect } from "../lib/api";
+import { spring } from "../lib/motion";
+import { HANDLE_CURSOR, clamp, contains, fitRatio, toImageRect, type Pt, type Rect } from "../components/selector/geometry";
+import { useSelection } from "../components/selector/useSelection";
+import Handles from "../components/selector/Handles";
+import Loupe from "../components/selector/Loupe";
+import SelectionHud from "../components/selector/SelectionHud";
 
 const MODE_HINT: Record<string, string> = {
   area: "Drag to capture · Space for window · Esc to cancel",
@@ -15,127 +18,197 @@ const MODE_HINT: Record<string, string> = {
   ocr: "Drag over text to copy it · Esc to cancel",
   timer: "Drag the area · capture starts after the timer",
 };
+const ADJUST_HINT = "Drag to move · Shift locks aspect · Arrows nudge · Enter to confirm";
+
+const bounds = () => ({ w: innerWidth, h: innerHeight });
+const inHud = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.("[data-hud]");
 
 export default function Selector() {
   const monitor = Number(param("m") ?? 0);
   const mode = param("mode") ?? "area";
   const imgRef = useRef<HTMLImageElement>(null);
-  const loupeRef = useRef<HTMLCanvasElement>(null);
   const [cursor, setCursor] = useState<Pt | null>(null);
-  const [start, setStart] = useState<Pt | null>(null);
+  const [overHud, setOverHud] = useState(false);
+  const [ratio, setRatio] = useState<number | null>(null);
+  const [scale, setScale] = useState(1); // CSS px -> frozen image px
+  const [loaded, setLoaded] = useState(false);
   const [windowMode, setWindowMode] = useState(mode === "window");
   const [windows, setWindows] = useState<WindowRect[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [last, setLast] = useState<Region | null>(null);
   const done = useRef(false);
-
-  // CSS px -> frozen image px
-  const k = () => (imgRef.current?.naturalWidth ?? innerWidth) / innerWidth;
+  const touched = useRef(false);
+  const { sel, setSel, drag, begin, apply, end, nudge, reapply } = useSelection(ratio);
 
   useEffect(() => {
     api.listWindows(monitor).then(setWindows).catch(() => {});
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") api.cancelSelection();
-      if (e.key === " " && ["area", "window"].includes(mode)) setWindowMode((w) => !w);
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, [monitor, mode]);
+    api.getSettings().then(setSettings).catch(() => {});
+    api.lastRegion().then(setLast).catch(() => {});
+  }, [monitor]);
 
-  const hovered = (() => {
-    if (!windowMode || !cursor) return null;
-    const s = k();
-    const px = cursor.x * s, py = cursor.y * s;
-    return windows.find((w) => px >= w.x && py >= w.y && px <= w.x + w.w && py <= w.y + w.h) ?? null;
-  })();
-
-  // Magnifier
+  // Remember last selection: place it, editable, once the image (scale) and settings are known.
   useEffect(() => {
-    const c = loupeRef.current, img = imgRef.current;
-    if (!c || !img || !cursor) return;
-    const ctx = c.getContext("2d")!;
-    const s = k();
-    const src = LOUPE / ZOOM;
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, LOUPE, LOUPE);
-    ctx.drawImage(img, cursor.x * s - src / 2, cursor.y * s - src / 2, src, src, 0, 0, LOUPE, LOUPE);
-    ctx.strokeStyle = "rgba(59,130,246,.9)";
-    ctx.strokeRect(LOUPE / 2 - ZOOM / 2, LOUPE / 2 - ZOOM / 2, ZOOM, ZOOM);
-  }, [cursor]);
+    if (!loaded || !settings || !last || touched.current || mode === "window") return;
+    if (!settings.selector_remember_last || last.monitor !== monitor) return;
+    touched.current = true;
+    const b = bounds();
+    const w = clamp(last.w / scale, 1, b.w), h = clamp(last.h / scale, 1, b.h);
+    setSel({ x: clamp(last.x / scale, 0, b.w - w), y: clamp(last.y / scale, 0, b.h - h), w, h });
+  }, [loaded, settings, last, scale, monitor, mode, setSel]);
 
-  const rect = start && cursor
-    ? { x: Math.min(start.x, cursor.x), y: Math.min(start.y, cursor.y), w: Math.abs(cursor.x - start.x), h: Math.abs(cursor.y - start.y) }
-    : null;
-
-  const finish = (r: { x: number; y: number; w: number; h: number }, windowId?: number) => {
+  const finishImage = (r: Rect, windowId?: number) => {
     if (done.current) return;
     done.current = true;
-    const s = k();
-    api.finishSelection(
-      { monitor, x: Math.round(r.x * s), y: Math.round(r.y * s), w: Math.max(1, Math.round(r.w * s)), h: Math.max(1, Math.round(r.h * s)) },
-      windowId,
-    );
+    api.finishSelection({ monitor, ...r }, windowId);
   };
+  const confirm = () => sel && finishImage(toImageRect(sel, scale));
 
-  const onUp = () => {
-    if (rect && rect.w > 4 && rect.h > 4) finish(rect);
-    else if (hovered) {
-      const s = k();
-      finish({ x: hovered.x / s, y: hovered.y / s, w: hovered.w / s, h: hovered.h / s }, mode === "record" || mode === "scroll" ? undefined : hovered.id);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Shift") reapply(e.type === "keydown");
+      if (e.type !== "keydown") return;
+      if (e.key === "Escape") api.cancelSelection();
+      if (e.key === " " && ["area", "window"].includes(mode)) {
+        e.preventDefault();
+        if (!windowMode) setSel(null);
+        setWindowMode(!windowMode);
+      } else if (e.key === "Enter" && sel) {
+        e.preventDefault();
+        confirm();
+      } else if (sel && e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        const step = (e.shiftKey ? 10 : 1) / scale; // image pixels, not CSS pixels
+        nudge(e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0, e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0);
+      }
+    };
+    addEventListener("keydown", onKey);
+    addEventListener("keyup", onKey);
+    return () => { removeEventListener("keydown", onKey); removeEventListener("keyup", onKey); };
+  });
+
+  const hovered = (() => {
+    if (!windowMode || !cursor || sel || drag) return null;
+    const px = cursor.x * scale, py = cursor.y * scale;
+    return windows.find((w) => px >= w.x && py >= w.y && px <= w.x + w.w && py <= w.y + w.h) ?? null;
+  })();
+  const hl: Rect | null = hovered ? { x: hovered.x / scale, y: hovered.y / scale, w: hovered.w / scale, h: hovered.h / scale } : null;
+  const box = sel ?? hl;
+
+  const pt = (e: React.PointerEvent | React.MouseEvent): Pt => ({ x: e.clientX, y: e.clientY });
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || inHud(e.target)) return;
+    touched.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId); // keep tracking outside the window edge
+    begin(pt(e), e.target as HTMLElement);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    setCursor(pt(e));
+    setOverHud(inHud(e.target));
+    apply(pt(e), e.shiftKey);
+  };
+  const onPointerUp = () => {
+    const { kind, tiny } = end();
+    if (kind === "draw" && tiny && hovered) {
+      finishImage({ x: hovered.x, y: hovered.y, w: hovered.w, h: hovered.h }, mode === "record" || mode === "scroll" ? undefined : hovered.id);
     }
-    setStart(null);
   };
 
-  const hl = hovered && !rect ? { x: hovered.x / k(), y: hovered.y / k(), w: hovered.w / k(), h: hovered.h / k() } : null;
-  const box = rect ?? hl;
+  const cursorStyle = drag?.kind === "resize" ? HANDLE_CURSOR[drag.handle!] : drag?.kind === "move" ? "grabbing" : "crosshair";
+  const showLoupe = !!(settings?.selector_show_magnifier && cursor && !overHud && drag?.kind !== "move" && drag?.kind !== "resize");
+  const drawing = drag?.kind === "draw";
+  const tagTop = box ? (box.y > 34 ? box.y - 30 : box.y + box.h + 6) : 0;
 
   return (
-    <div
-      className="fixed inset-0 cursor-crosshair overflow-hidden"
-      onMouseMove={(e) => setCursor({ x: e.clientX, y: e.clientY })}
-      onMouseDown={(e) => e.button === 0 && setStart({ x: e.clientX, y: e.clientY })}
-      onMouseUp={onUp}
-      onContextMenu={(e) => { e.preventDefault(); api.cancelSelection(); }}
-    >
-      <img
-        ref={imgRef}
-        src={convertFileSrc(String(monitor), "frozen")}
-        className="absolute inset-0 h-full w-full"
-        draggable={false}
-        onLoad={() => { const w = getCurrentWindow(); w.show(); w.setFocus(); }}
-      />
-      {box ? (
-        <div
-          className="pointer-events-none absolute rounded-[2px] outline outline-1 outline-white/90"
-          style={{ left: box.x, top: box.y, width: box.w, height: box.h, boxShadow: "0 0 0 99999px rgba(0,0,0,.42)" }}
-        >
-          <span className="absolute -top-7 left-0 rounded-md bg-black/75 px-2 py-0.5 text-[11px] font-medium text-white tabular-nums">
-            {Math.round(box.w * k())} × {Math.round(box.h * k())}
-            {hl && hovered ? ` · ${hovered.app}` : ""}
-          </span>
-        </div>
-      ) : (
-        <div className="pointer-events-none absolute inset-0 bg-black/10" />
-      )}
-      {cursor && !rect && (
-        <>
-          <div className="pointer-events-none absolute top-0 h-full w-px bg-white/50 mix-blend-difference" style={{ left: cursor.x }} />
-          <div className="pointer-events-none absolute left-0 h-px w-full bg-white/50 mix-blend-difference" style={{ top: cursor.y }} />
-        </>
-      )}
-      {cursor && (
-        <div
-          className="pointer-events-none absolute overflow-hidden rounded-full border-2 border-white/80 shadow-2xl"
-          style={{
-            width: LOUPE, height: LOUPE,
-            left: cursor.x + LOUPE + 24 > innerWidth ? cursor.x - LOUPE - 24 : cursor.x + 24,
-            top: cursor.y + LOUPE + 24 > innerHeight ? cursor.y - LOUPE - 24 : cursor.y + 24,
+    <MotionConfig reducedMotion="user">
+      <div
+        className="fixed inset-0 select-none overflow-hidden"
+        style={{ cursor: cursorStyle, touchAction: "none" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onPointerLeave={() => setOverHud(false)}
+        onDoubleClick={(e) => { if (sel && !inHud(e.target) && contains(sel, pt(e))) confirm(); }}
+        onContextMenu={(e) => { e.preventDefault(); api.cancelSelection(); }}
+      >
+        <img
+          ref={imgRef}
+          src={convertFileSrc(String(monitor), "frozen")}
+          crossOrigin="anonymous"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          draggable={false}
+          onLoad={(e) => {
+            setScale(e.currentTarget.naturalWidth / innerWidth || 1);
+            setLoaded(true);
+            const w = getCurrentWindow(); w.show(); w.setFocus();
           }}
-        >
-          <canvas ref={loupeRef} width={LOUPE} height={LOUPE} />
-        </div>
-      )}
-      <div className="glass pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full px-4 py-2 text-xs font-medium">
-        {windowMode && ["area", "window"].includes(mode) ? MODE_HINT.window : MODE_HINT[mode] ?? MODE_HINT.area}
+        />
+
+        {box ? (
+          <div
+            className="absolute rounded-[1px]"
+            style={{
+              left: box.x, top: box.y, width: box.w, height: box.h,
+              pointerEvents: sel ? "auto" : "none",
+              boxShadow: "inset 0 0 0 1px #fff, 0 0 0 1px rgba(0,0,0,.35), 0 0 0 99999px rgba(0,0,0,.45)",
+            }}
+          >
+            {sel && (
+              <>
+                <div data-role="move" className="absolute inset-0" style={{ cursor: drag ? undefined : "move" }} />
+                <Handles />
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="pointer-events-none absolute inset-0 bg-black/10" />
+        )}
+
+        {box && (drawing || hl) && (
+          <div className="mat-hud t-caption tabular pointer-events-none absolute rounded-md px-2 py-0.5 font-medium" style={{ left: box.x, top: tagTop, color: "#fff" }}>
+            {Math.round(box.w * scale)} × {Math.round(box.h * scale)}
+            {hl && hovered ? ` · ${hovered.app}` : ""}
+          </div>
+        )}
+
+        {cursor && !sel && !drag && (
+          <>
+            <div className="pointer-events-none absolute top-0 h-full w-px bg-white/50 mix-blend-difference" style={{ left: cursor.x }} />
+            <div className="pointer-events-none absolute left-0 h-px w-full bg-white/50 mix-blend-difference" style={{ top: cursor.y }} />
+          </>
+        )}
+
+        {sel && !drawing && (
+          <SelectionHud
+            rect={sel}
+            scale={scale}
+            mode={mode}
+            ratio={ratio}
+            onRatio={(r) => { setRatio(r); if (r) setSel(fitRatio(sel, r, bounds())); }}
+            onConfirm={confirm}
+            onCancel={() => api.cancelSelection()}
+          />
+        )}
+
+        {showLoupe && cursor && <Loupe cursor={cursor} img={imgRef} scale={scale} />}
+
+        <AnimatePresence>
+          {!drag && (
+            <motion.div
+              key={sel ? "adjust" : "hint"}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={spring.ui}
+              className="mat-hud t-caption pointer-events-none absolute bottom-8 rounded-full px-4 py-2 font-medium"
+              style={{ color: "#fff", x: "-50%", left: "50%" }}
+            >
+              {sel ? ADJUST_HINT : windowMode && ["area", "window"].includes(mode) ? MODE_HINT.window : MODE_HINT[mode] ?? MODE_HINT.area}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </MotionConfig>
   );
 }

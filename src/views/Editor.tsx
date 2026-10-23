@@ -3,15 +3,23 @@ import Konva from "konva";
 import { Group, Image as KImage, Layer, Rect, Shape as KShape, Stage, Transformer } from "react-konva";
 import { save } from "@tauri-apps/plugin-dialog";
 import { AnimatePresence, motion } from "motion/react";
-import { Copy, Download, ImagePlus, Pin, Redo2, Save, Undo2, UploadCloud, Check } from "lucide-react";
 import { api, fileName, param } from "../lib/api";
-import Toolbar, { TOOLS } from "../components/editor/Toolbar";
+import { materialize, spring } from "../lib/motion";
 import ShapeNode from "../components/editor/ShapeNode";
 import BackgroundPanel from "../components/editor/BackgroundPanel";
-import { GRADIENTS, norm, type Background, type Shape, type Tool } from "../components/editor/types";
+import LineHandles from "../components/editor/LineHandles";
+import TopBar from "../components/editor/TopBar";
+import Toast from "../components/editor/Toast";
+import type { StylePatch, StyleValues } from "../components/editor/StyleBar";
+import { useZoom } from "../components/editor/useZoom";
+import { useEditorKeys } from "../components/editor/useEditorKeys";
+import { FONT, contrast, fontOf, measure, pill } from "../components/editor/text";
+import { ASPECTS, GRADIENTS, norm, type Background, type Shape, type Tool } from "../components/editor/types";
 
 type Doc = { base: string; shapes: Shape[] };
 const uid = () => Math.random().toString(36).slice(2);
+const RESIZABLE = ["rect", "filled", "ellipse", "pixelate", "blur", "spotlight", "text", "emoji"];
+const CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"];
 
 function useImage(src: string) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
@@ -27,49 +35,70 @@ function useImage(src: string) {
 export default function Editor() {
   const path = param("p") ?? "";
   const [doc, setDoc] = useState<Doc>({ base: "", shapes: [] });
+  const [original, setOriginal] = useState("");
   const [past, setPast] = useState<Doc[]>([]);
   const [future, setFuture] = useState<Doc[]>([]);
   const [tool, setTool] = useState<Tool>("arrow");
-  const [color, setColor] = useState("#ff3b30");
-  const [size, setSize] = useState(4);
-  const [emoji, setEmoji] = useState("👍");
+  const [style, setStyle] = useState<StyleValues>({ color: "#ff3b30", size: 4, emoji: "👍", textBg: "none", counterStart: 1 });
   const [draft, setDraft] = useState<Shape | null>(null);
+  const [live, setLive] = useState<Shape | null>(null); // endpoint-handle drag preview
+  const [moving, setMoving] = useState(false);
   const [crop, setCrop] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  const [bg, setBg] = useState<Background>({ enabled: false, padding: 64, gradient: 0, radius: 12, shadow: true });
+  const [editText, setEditText] = useState("");
+  const [bg, setBg] = useState<Background>({ enabled: false, padding: 64, gradient: 0, radius: 12, shadow: true, mode: "gradient", color: "#f5f5f4", aspect: "auto" });
   const [view, setView] = useState({ w: 800, h: 600 });
   const [toast, setToast] = useState<string | null>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const groupRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
-  const areaRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<Konva.Layer>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const img = useImage(doc.base);
   const down = useRef(false);
+  const toastTimer = useRef<number>(0);
+  const coalesce = useRef({ key: "", t: 0 });
 
-  useEffect(() => { api.blobUrl(path).then((base) => setDoc({ base, shapes: [] })); }, [path]);
+  useEffect(() => { api.blobUrl(path).then((base) => { setOriginal(base); setDoc({ base, shapes: [] }); }); }, [path]);
 
   useEffect(() => {
-    const el = areaRef.current!;
+    const el = scrollRef.current!;
     const ro = new ResizeObserver(() => setView({ w: el.clientWidth, h: el.clientHeight }));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
+  // Canvas geometry (image px): background padding, then optional aspect padding, image centered.
   const iw = img?.width ?? 1, ih = img?.height ?? 1;
   const unit = Math.max(1, iw / 1400);
   const pad = bg.enabled ? bg.padding * unit : 0;
-  const W = iw + pad * 2, H = ih + pad * 2;
-  const scale = Math.min(1, (view.w - 48) / W, (view.h - 48) / H);
+  const bw = iw + pad * 2, bh = ih + pad * 2;
+  const ratio = bg.enabled ? ASPECTS[bg.aspect] : 0;
+  const W = ratio && bw / bh < ratio ? bh * ratio : bw;
+  const H = ratio && bw / bh >= ratio ? bw / ratio : bh;
+  const ox = (W - iw) / 2, oy = (H - ih) / 2;
+  const zoom = useZoom(view, W, H, scrollRef);
+  const scale = zoom.scale;
 
   const commit = useCallback((next: Doc) => {
+    coalesce.current.key = "";
     setPast((p) => [...p.slice(-50), doc]);
     setFuture([]);
     setDoc(next);
   }, [doc]);
+  /** Like commit, but repeated edits of the same kind within 700 ms (nudges, color drags) share one undo step. */
+  const commitCoalesced = (key: string, next: Doc) => {
+    const c = coalesce.current, now = Date.now();
+    if (c.key === key && now - c.t < 700) setDoc(next);
+    else commit(next);
+    coalesce.current = { key, t: now };
+  };
   const setShapes = (shapes: Shape[]) => commit({ ...doc, shapes });
+  const patchShape = (id: string, patch: Partial<Shape>) => setShapes(doc.shapes.map((o) => (o.id === id ? { ...o, ...patch } : o)));
   const undo = () => past.length && (setFuture((f) => [doc, ...f]), setDoc(past[past.length - 1]), setPast((p) => p.slice(0, -1)));
   const redo = () => future.length && (setPast((p) => [...p, doc]), setDoc(future[0]), setFuture((f) => f.slice(1)));
+  const revert = () => { setSelected(null); commit({ base: original, shapes: [] }); };
 
   const pointer = () => groupRef.current!.getRelativePointerPosition()!;
 
@@ -81,12 +110,13 @@ export default function Editor() {
     }
     down.current = true;
     const p = pointer();
-    const s: Shape = { id: uid(), kind: tool as Shape["kind"], x: p.x, y: p.y, w: 0, h: 0, color, size };
+    const s: Shape = { id: uid(), kind: tool as Shape["kind"], x: p.x, y: p.y, w: 0, h: 0, color: style.color, size: style.size };
     if (tool === "crop") return setCrop({ x: p.x, y: p.y, w: 0, h: 0 });
     if (tool === "counter") return setShapes([...doc.shapes, s]);
-    if (tool === "emoji") return setShapes([...doc.shapes, { ...s, text: emoji }]);
+    if (tool === "emoji") return setShapes([...doc.shapes, { ...s, text: style.emoji }]);
     if (tool === "text") {
-      setShapes([...doc.shapes, { ...s, text: "" }]);
+      setShapes([...doc.shapes, { ...s, text: "", bg: style.textBg }]);
+      setEditText("");
       return setEditing(s.id);
     }
     if (tool === "pen" || tool === "highlighter") s.points = [0, 0];
@@ -111,21 +141,47 @@ export default function Editor() {
     }
   };
 
-  // Transformer follows the selected node (move-only).
+  const shapes = live ? doc.shapes.map((s) => (s.id === live.id ? live : s)) : doc.shapes;
+  const all = draft ? [...shapes, draft] : shapes;
+  const sel = tool === "select" ? shapes.find((s) => s.id === selected) : undefined;
+  const linear = sel?.kind === "arrow" || sel?.kind === "line";
+  const resizable = !!sel && RESIZABLE.includes(sel.kind);
+  const keepRatio = sel?.kind === "text" || sel?.kind === "emoji";
+
+  // Transformer follows the selected node (not for lines/arrows, which use endpoint handles).
   useEffect(() => {
     const tr = trRef.current;
     if (!tr) return;
-    const node = selected ? stageRef.current?.findOne(`#${selected}`) : null;
+    const node = sel && !linear && !editing ? stageRef.current?.findOne(`#${sel.id}`) : null;
     tr.nodes(node ? [node] : []);
     tr.getLayer()?.batchDraw();
-  }, [selected, doc]);
+  }, [sel, linear, editing, doc, live]);
 
-  /** Full-resolution PNG of the current composition. */
+  /** Bake the Transformer's scale into geometry (or font size) and reset it to 1. */
+  const bake = (node: Konva.Node) => {
+    const s = doc.shapes.find((o) => o.id === node.id());
+    if (!s) return;
+    const sx = Math.abs(node.scaleX()), sy = Math.abs(node.scaleY());
+    node.scale({ x: 1, y: 1 });
+    if (s.kind === "text" || s.kind === "emoji") return patchShape(s.id, { x: node.x(), y: node.y(), fontSize: fontOf(s, unit) * sy });
+    if (s.kind === "ellipse") {
+      const w = s.w * sx, h = s.h * sy;
+      return patchShape(s.id, { w, h, x: node.x() - w / 2, y: node.y() - h / 2 });
+    }
+    patchShape(s.id, { x: node.x(), y: node.y(), w: s.w * sx, h: s.h * sy });
+  };
+
+  /** Full-resolution PNG of the current composition; selection UI and editor-only overlays are hidden. */
   const exportPng = (region?: { x: number; y: number; w: number; h: number }) => {
     const st = stageRef.current!;
-    trRef.current?.nodes([]);
-    const r = region ?? { x: -pad, y: -pad, w: W, h: H };
-    return st.toDataURL({ x: (r.x + pad) * scale, y: (r.y + pad) * scale, width: r.w * scale, height: r.h * scale, pixelRatio: 1 / scale });
+    const hide = [overlayRef.current!, ...st.find(".ui")].filter((n) => n.visible());
+    hide.forEach((n) => n.hide());
+    try {
+      const r = region ?? { x: -ox, y: -oy, w: W, h: H };
+      return st.toDataURL({ x: (r.x + ox) * scale, y: (r.y + oy) * scale, width: r.w * scale, height: r.h * scale, pixelRatio: 1 / scale });
+    } finally {
+      hide.forEach((n) => n.show());
+    }
   };
 
   const applyCrop = async () => {
@@ -138,7 +194,11 @@ export default function Editor() {
     setTool("select");
   };
 
-  const flash = (t: string) => { setToast(t); setTimeout(() => setToast(null), 1500); };
+  const flash = (t: string) => {
+    setToast(t);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 1600);
+  };
   const act = async (f: () => Promise<unknown>, msg: string) => { try { await f(); flash(msg); } catch (e) { flash(String(e)); } };
   const doCopy = () => act(() => api.copyPng(exportPng()), "Copied to clipboard");
   const doSave = () => act(() => api.writePng(exportPng(), path), "Saved");
@@ -149,138 +209,177 @@ export default function Editor() {
   const doPin = () => act(async () => api.openPin(await api.writePng(exportPng())), "Pinned");
   const doUpload = () => act(async () => api.upload(await api.writePng(exportPng(), path)), "Link copied");
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (editing || (e.target as HTMLElement).tagName === "INPUT") return;
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
-      if (mod && e.key === "c") { e.preventDefault(); doCopy(); return; }
-      if (mod && e.key === "s") { e.preventDefault(); e.shiftKey ? doSaveAs() : doSave(); return; }
-      if ((e.key === "Delete" || e.key === "Backspace") && selected) { setShapes(doc.shapes.filter((s) => s.id !== selected)); setSelected(null); return; }
-      if (e.key === "Enter" && crop) { applyCrop(); return; }
-      if (e.key === "Escape") { setCrop(null); setSelected(null); return; }
-      const t = TOOLS.find((t) => t.key === e.key.toLowerCase());
-      if (t && !mod) setTool(t.id);
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
+  const remove = () => { setShapes(doc.shapes.filter((s) => s.id !== selected)); setSelected(null); };
+  const duplicate = () => {
+    const s = doc.shapes.find((o) => o.id === selected);
+    if (!s) return;
+    const d = 16 * unit, copy = { ...s, id: uid(), x: s.x + d, y: s.y + d };
+    setShapes([...doc.shapes, copy]);
+    setSelected(copy.id);
+  };
+  const nudge = (dx: number, dy: number) => {
+    if (!selected) return;
+    commitCoalesced(`nudge:${selected}`, { ...doc, shapes: doc.shapes.map((s) => (s.id === selected ? { ...s, x: s.x + dx, y: s.y + dy } : s)) });
+  };
+
+  useEditorKeys({
+    editing: !!editing, hasCrop: !!crop, hasSelection: !!selected && tool === "select",
+    undo, redo, copy: doCopy, save: doSave, saveAs: doSaveAs, remove, duplicate, nudge, applyCrop,
+    escape: () => { setCrop(null); setSelected(null); },
+    setTool, zoomIn: zoom.zoomIn, zoomOut: zoom.zoomOut, zoomFit: zoom.fit, zoomActual: zoom.actual,
   });
 
   useEffect(() => { if (tool === "crop") setBg((b) => ({ ...b, enabled: false })); if (tool !== "select") setSelected(null); }, [tool]);
 
-  const all = draft ? [...doc.shapes, draft] : doc.shapes;
+  // Style bar edits the selected object when there is one, and always updates the defaults for new objects.
+  const shown: StyleValues = sel
+    ? { ...style, color: sel.color, size: sel.size, textBg: sel.bg ?? "none" }
+    : style;
+  const onStyle = (p: StylePatch) => {
+    setStyle((s) => ({ ...s, ...p }));
+    if (!sel || !selected) return;
+    const patch: Partial<Shape> = {};
+    if (p.color) patch.color = p.color;
+    if (p.size) { patch.size = p.size; patch.fontSize = undefined; }
+    if (p.textBg) patch.bg = p.textBg;
+    if (Object.keys(patch).length)
+      commitCoalesced(`style:${selected}:${Object.keys(patch).join()}`, { ...doc, shapes: doc.shapes.map((s) => (s.id === selected ? { ...s, ...patch } : s)) });
+  };
+
   const counters = useMemo(() => {
     const m = new Map<string, number>();
-    all.filter((s) => s.kind === "counter").forEach((s, i) => m.set(s.id, i + 1));
+    all.filter((s) => s.kind === "counter").forEach((s, i) => m.set(s.id, style.counterStart + i));
     return m;
-  }, [all]);
+  }, [all, style.counterStart]);
   const spots = all.filter((s) => s.kind === "spotlight").map(norm);
   const editingShape = doc.shapes.find((s) => s.id === editing);
   const [g0, g1] = GRADIENTS[bg.gradient];
 
+  const finishEdit = (raw: string) => {
+    const text = raw.trim();
+    setDoc((d) => ({ ...d, shapes: text ? d.shapes.map((s) => (s.id === editing ? { ...s, text } : s)) : d.shapes.filter((s) => s.id !== editing) }));
+    setEditing(null);
+  };
+
+  const editor = (() => {
+    if (!editingShape) return null;
+    const fs = fontOf(editingShape, unit), solid = editingShape.bg === "solid", p = solid ? pill(fs) : { px: 0, py: 0, r: 0 };
+    const m = measure(editText || " ", fs);
+    return {
+      left: (editingShape.x + ox) * scale, top: (editingShape.y + oy) * scale,
+      fontSize: fs * scale, width: (m.w + p.px * 2) * scale + 4, 
+      pad: `${p.py * scale}px ${p.px * scale}px`, radius: Math.min(p.r, (m.h + p.py * 2) / 2) * scale,
+      color: solid ? contrast(editingShape.color) : editingShape.color, background: solid ? editingShape.color : "transparent",
+    };
+  })();
+
   return (
     <div className="flex h-full flex-col">
-      <header className="glass relative z-10 m-2 flex items-center justify-between gap-2 rounded-2xl px-2 py-1.5">
-        <Toolbar {...{ tool, setTool, color, setColor, size, setSize, emoji, setEmoji }} />
-        <div className="flex items-center gap-1">
-          <button className="btn !p-2" title="Undo (⌘Z)" onClick={undo} disabled={!past.length}><Undo2 size={16} /></button>
-          <button className="btn !p-2" title="Redo (⇧⌘Z)" onClick={redo} disabled={!future.length}><Redo2 size={16} /></button>
-          <button className="btn !p-2" title="Background" data-active={bg.enabled} onClick={() => setBg({ ...bg, enabled: !bg.enabled })}><ImagePlus size={16} /></button>
-          <span className="mx-1 h-6 w-px bg-current opacity-15" />
-          <button className="btn !p-2" title="Pin" onClick={doPin}><Pin size={16} /></button>
-          <button className="btn !p-2" title="Upload" onClick={doUpload}><UploadCloud size={16} /></button>
-          <button className="btn !p-2" title="Save As (⇧⌘S)" onClick={doSaveAs}><Download size={16} /></button>
-          <button className="btn" title="Save (⌘S)" onClick={doSave}><Save size={16} />Save</button>
-          <button className="btn btn-primary" title="Copy (⌘C)" onClick={doCopy}><Copy size={16} />Copy</button>
-        </div>
-      </header>
+      <TopBar
+        tool={tool} setTool={setTool} styleKind={sel ? sel.kind : tool} style={shown} onStyle={onStyle} zoom={zoom}
+        canUndo={past.length > 0} canRedo={future.length > 0} canRevert={doc.base !== original || doc.shapes.length > 0}
+        bgOn={bg.enabled} undo={undo} redo={redo} revert={revert} toggleBg={() => setBg({ ...bg, enabled: !bg.enabled })}
+        pin={doPin} upload={doUpload} saveAs={doSaveAs} save={doSave} copy={doCopy} />
 
-      <div className="flex min-h-0 flex-1 gap-2 px-2 pb-2">
-        <div ref={areaRef} className="relative grid min-w-0 flex-1 place-items-center overflow-hidden rounded-2xl"
-          style={{ backgroundImage: "repeating-conic-gradient(#8881 0 25%, transparent 0 50%)", backgroundSize: "20px 20px" }}>
-          {img && (
-            <Stage ref={stageRef} width={W * scale} height={H * scale} scaleX={scale} scaleY={scale}
-              onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp}
-              style={{ cursor: tool === "select" ? "default" : "crosshair", boxShadow: bg.enabled ? "none" : "0 8px 30px rgba(0,0,0,.25)" }}>
-              <Layer>
-                {bg.enabled && (
-                  <>
-                    <Rect width={W} height={H} fillLinearGradientStartPoint={{ x: 0, y: 0 }} fillLinearGradientEndPoint={{ x: W, y: H }}
-                      fillLinearGradientColorStops={[0, g0, 1, g1]} />
-                    {bg.shadow && <Rect x={pad} y={pad} width={iw} height={ih} cornerRadius={bg.radius * unit} fill="black"
-                      shadowColor="black" shadowBlur={40 * unit} shadowOpacity={0.45} shadowOffsetY={12 * unit} />}
-                  </>
+      <div className="flex min-h-0 flex-1">
+        <div className="relative min-w-0 flex-1">
+          <div ref={scrollRef} className="absolute inset-0 flex overflow-auto p-6">
+            {img && (
+              <div className="relative m-auto shrink-0" style={{ width: W * scale, height: H * scale }}>
+                <Stage ref={stageRef} width={W * scale} height={H * scale} scaleX={scale} scaleY={scale}
+                  onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp}
+                  style={{ cursor: tool === "select" ? "default" : "crosshair", boxShadow: bg.enabled ? "none" : "var(--shadow-lg)", borderRadius: bg.enabled ? 0 : 2 }}>
+                  <Layer>
+                    {bg.enabled && (
+                      <>
+                        {bg.mode === "gradient"
+                          ? <Rect width={W} height={H} fillLinearGradientStartPoint={{ x: 0, y: 0 }} fillLinearGradientEndPoint={{ x: W, y: H }}
+                              fillLinearGradientColorStops={[0, g0, 1, g1]} />
+                          : <Rect width={W} height={H} fill={bg.color} />}
+                        {bg.shadow && <Rect x={ox} y={oy} width={iw} height={ih} cornerRadius={bg.radius * unit} fill="black"
+                          shadowColor="black" shadowBlur={40 * unit} shadowOpacity={0.45} shadowOffsetY={12 * unit} />}
+                      </>
+                    )}
+                    <Group ref={groupRef} x={ox} y={oy}
+                      clipFunc={bg.enabled ? (ctx) => { ctx.beginPath(); ctx.roundRect(0, 0, iw, ih, bg.radius * unit); ctx.closePath(); } : undefined}>
+                      <KImage image={img} name="base" />
+                      {all.map((s) => (
+                        <ShapeNode key={s.id} s={s} unit={unit} base={img} counter={counters.get(s.id) ?? 0}
+                          draggable={tool === "select"} editing={editing === s.id}
+                          onSelect={() => tool === "select" && setSelected(s.id)}
+                          onDragStart={() => setMoving(true)}
+                          onMove={(x, y) => { setMoving(false); patchShape(s.id, { x, y }); }}
+                          onTransform={bake}
+                          onEdit={() => { if (s.kind === "text") { setEditText(s.text ?? ""); setEditing(s.id); } }} />
+                      ))}
+                      {spots.length > 0 && (
+                        <KShape listening={false} sceneFunc={(ctx) => {
+                          const c = (ctx as unknown as { _context: CanvasRenderingContext2D })._context;
+                          c.beginPath();
+                          c.rect(0, 0, iw, ih);
+                          spots.forEach((s) => c.roundRect(s.x, s.y, s.w, s.h, 8 * unit));
+                          c.fillStyle = "rgba(0,0,0,.55)";
+                          c.fill("evenodd");
+                        }} />
+                      )}
+                      {crop && (() => {
+                        const c = norm({ ...crop, id: "", kind: "rect", color: "", size: 0 });
+                        return <KShape name="ui" listening={false} sceneFunc={(ctx) => {
+                          const k = (ctx as unknown as { _context: CanvasRenderingContext2D })._context;
+                          k.beginPath(); k.rect(0, 0, iw, ih); k.rect(c.x, c.y, c.w, c.h);
+                          k.fillStyle = "rgba(0,0,0,.5)"; k.fill("evenodd");
+                          k.strokeStyle = "white"; k.lineWidth = 2 * unit; k.setLineDash([8 * unit, 6 * unit]); k.strokeRect(c.x, c.y, c.w, c.h);
+                        }} />;
+                      })()}
+                    </Group>
+                  </Layer>
+                  {/* Overlay layer: selection UI only. Hidden during export. */}
+                  <Layer ref={overlayRef}>
+                    <Transformer ref={trRef} rotateEnabled={false} flipEnabled={false} resizeEnabled={resizable}
+                      enabledAnchors={resizable ? (keepRatio ? CORNERS : undefined) : []} keepRatio={keepRatio}
+                      borderStroke="#0a84ff" borderStrokeWidth={1.5} anchorSize={9} anchorCornerRadius={5} anchorStroke="#0a84ff"
+                      anchorFill="#fff" anchorStrokeWidth={1.5} padding={2}
+                      boundBoxFunc={(o, n) => (n.width < 8 || n.height < 8 ? o : n)} />
+                    <Group x={ox} y={oy}>
+                      {sel && linear && !moving && !editing && (
+                        <LineHandles s={sel} scale={scale} onChange={setLive}
+                          onEnd={(n) => { setLive(null); patchShape(n.id, { x: n.x, y: n.y, w: n.w, h: n.h }); }} />
+                      )}
+                    </Group>
+                  </Layer>
+                </Stage>
+                {editingShape && editor && (
+                  <textarea autoFocus value={editText} rows={Math.max(1, editText.split("\n").length)} spellCheck={false}
+                    className="absolute resize-none overflow-hidden border-0 font-bold outline-none"
+                    style={{
+                      left: editor.left, top: editor.top, fontSize: editor.fontSize, width: Math.max(editor.width, 24), color: editor.color,
+                      background: editor.background, padding: editor.pad, borderRadius: editor.radius, lineHeight: 1, fontFamily: FONT,
+                      boxShadow: "0 0 0 2px var(--accent)", caretColor: editor.color === "#ffffff" ? "#fff" : editor.color,
+                    }}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onBlur={(e) => finishEdit(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Escape" || (e.key === "Enter" && !e.shiftKey)) (e.target as HTMLTextAreaElement).blur(); }} />
                 )}
-                <Group ref={groupRef} x={pad} y={pad}
-                  clipFunc={bg.enabled ? (ctx) => { ctx.beginPath(); ctx.roundRect(0, 0, iw, ih, bg.radius * unit); ctx.closePath(); } : undefined}>
-                  <KImage image={img} name="base" />
-                  {all.filter((s) => s.kind !== "spotlight").map((s) => (
-                    <ShapeNode key={s.id} s={s} unit={unit} base={img} counter={counters.get(s.id) ?? 0}
-                      draggable={tool === "select"}
-                      onSelect={() => tool === "select" && setSelected(s.id)}
-                      onMove={(x, y) => setShapes(doc.shapes.map((o) => (o.id === s.id ? { ...o, x, y } : o)))}
-                      onEdit={() => s.kind === "text" && setEditing(s.id)} />
-                  ))}
-                  {spots.length > 0 && (
-                    <KShape listening={false} sceneFunc={(ctx) => {
-                      const c = (ctx as unknown as { _context: CanvasRenderingContext2D })._context;
-                      c.beginPath();
-                      c.rect(0, 0, iw, ih);
-                      spots.forEach((s) => c.roundRect(s.x, s.y, s.w, s.h, 8 * unit));
-                      c.fillStyle = "rgba(0,0,0,.55)";
-                      c.fill("evenodd");
-                    }} />
-                  )}
-                  {crop && (() => {
-                    const c = norm({ ...crop, id: "", kind: "rect", color: "", size: 0 });
-                    return <KShape listening={false} sceneFunc={(ctx) => {
-                      const k = (ctx as unknown as { _context: CanvasRenderingContext2D })._context;
-                      k.beginPath(); k.rect(0, 0, iw, ih); k.rect(c.x, c.y, c.w, c.h);
-                      k.fillStyle = "rgba(0,0,0,.5)"; k.fill("evenodd");
-                      k.strokeStyle = "white"; k.lineWidth = 2 * unit; k.setLineDash([8 * unit, 6 * unit]); k.strokeRect(c.x, c.y, c.w, c.h);
-                    }} />;
-                  })()}
-                </Group>
-              </Layer>
-              <Layer><Transformer ref={trRef} resizeEnabled={false} rotateEnabled={false} borderStroke="#3b82f6" /></Layer>
-            </Stage>
-          )}
-          {editingShape && (
-            <textarea autoFocus defaultValue={editingShape.text}
-              className="absolute resize-none rounded border-2 border-blue-500 bg-white/90 p-1 font-bold text-black outline-none"
-              style={{
-                left: `calc(50% - ${(W * scale) / 2}px + ${(editingShape.x + pad) * scale}px)`,
-                top: `calc(50% - ${(H * scale) / 2}px + ${(editingShape.y + pad) * scale}px)`,
-                fontSize: Math.max(12, (8 * editingShape.size * unit + 10 * unit) * scale), minWidth: 160, color: editingShape.color,
-              }}
-              onBlur={(e) => {
-                const text = e.target.value.trim();
-                setDoc((d) => ({ ...d, shapes: text ? d.shapes.map((s) => (s.id === editing ? { ...s, text } : s)) : d.shapes.filter((s) => s.id !== editing) }));
-                setEditing(null);
-              }}
-              onKeyDown={(e) => { if (e.key === "Escape" || (e.key === "Enter" && !e.shiftKey)) (e.target as HTMLTextAreaElement).blur(); }} />
-          )}
-          {crop && tool === "crop" && (
-            <div className="glass absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2 rounded-full px-3 py-1.5 text-xs">
-              <button className="btn" onClick={() => setCrop(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={applyCrop}>Apply crop ↩</button>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
+
           <AnimatePresence>
-            {toast && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="absolute top-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/80 px-4 py-2 text-sm text-white">
-                <Check size={14} />{toast}
+            {crop && tool === "crop" && (
+              <motion.div {...materialize} transition={spring.ui} className="mat-hud absolute bottom-12 left-1/2 flex -translate-x-1/2 gap-1 rounded-full p-1">
+                <button className="btn rounded-full hover:bg-white/15" onClick={() => setCrop(null)}>Cancel</button>
+                <button className="btn btn-primary rounded-full" onClick={applyCrop}>Apply Crop</button>
               </motion.div>
             )}
           </AnimatePresence>
+          <div className="mat-hud tabular pointer-events-none absolute right-3 bottom-3 rounded-full px-2.5 py-1 text-[11px] font-medium">
+            {Math.round(W)} × {Math.round(H)} · {Math.round(scale * 100)}%
+          </div>
+          <Toast text={toast} />
         </div>
+
         <AnimatePresence>
-          {bg.enabled && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <BackgroundPanel bg={bg} setBg={setBg} />
-            </motion.div>
-          )}
+          {bg.enabled && <BackgroundPanel bg={bg} setBg={setBg} onClose={() => setBg({ ...bg, enabled: false })} />}
         </AnimatePresence>
       </div>
     </div>

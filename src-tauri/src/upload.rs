@@ -22,7 +22,12 @@ fn extract_url(body: &str) -> Option<String> {
 
 #[tauri::command]
 pub async fn upload(app: AppHandle, path: String) -> Result<String, String> {
-    let s = settings::get(&app);
+    upload_file(&app, path).await
+}
+
+/// Uploads and copies the share link. Shared by the command and after-capture automation.
+pub async fn upload_file(app: &AppHandle, path: String) -> Result<String, String> {
+    let s = settings::get(app);
     if s.upload_url.is_empty() {
         return Err("Set an upload endpoint in Settings → Cloud".into());
     }

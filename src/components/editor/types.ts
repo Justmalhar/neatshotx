@@ -16,9 +16,25 @@ export type Shape = {
   color: string;
   size: number;
   text?: string;
+  /** Explicit font size in image px (set after a resize); otherwise derived from `size`. */
+  fontSize?: number;
+  /** Text background style. */
+  bg?: "none" | "solid";
 };
 
-export type Background = { enabled: boolean; padding: number; gradient: number; radius: number; shadow: boolean };
+export type Aspect = "auto" | "16:9" | "4:3" | "1:1";
+export const ASPECTS: Record<Aspect, number> = { auto: 0, "16:9": 16 / 9, "4:3": 4 / 3, "1:1": 1 };
+
+export type Background = {
+  enabled: boolean;
+  padding: number;
+  gradient: number;
+  radius: number;
+  shadow: boolean;
+  mode: "gradient" | "color";
+  color: string;
+  aspect: Aspect;
+};
 
 export const GRADIENTS: [string, string][] = [
   ["#6366f1", "#ec4899"], ["#06b6d4", "#3b82f6"], ["#f59e0b", "#ef4444"], ["#10b981", "#14b8a6"],
@@ -26,6 +42,7 @@ export const GRADIENTS: [string, string][] = [
 ];
 export const COLORS = ["#ff3b30", "#ff9500", "#ffcc00", "#34c759", "#0a84ff", "#af52de", "#ffffff", "#111111"];
 export const EMOJIS = ["👍", "👀", "🔥", "✅", "❌", "⚠️", "💡", "🎉", "❤️", "😂", "🤔", "👉", "⭐", "🚀", "🐛", "📌"];
+export const SIZES = [2, 4, 7];
 
 /** Normalise a drag box so w/h are positive. */
 export const norm = (s: Shape): Shape =>

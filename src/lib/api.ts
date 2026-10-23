@@ -17,6 +17,12 @@ export type Settings = {
   record_show_clicks: boolean;
   record_show_keys: boolean;
   record_webcam: boolean;
+  screenshot_upload: boolean;
+  screenshot_annotate: boolean;
+  screenshot_pin: boolean;
+  recording_quick_access: boolean;
+  recording_save: boolean;
+  recording_upload: boolean;
   record_countdown: boolean;
   keystrokes_only_modifiers: boolean;
   qa_position: "left" | "right";

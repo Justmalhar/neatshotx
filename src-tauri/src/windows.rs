@@ -42,12 +42,15 @@ pub fn normal(app: &AppHandle, label: &str, route: &str, title: &str, w: f64, h:
         existing.set_focus()?;
         return Ok(existing);
     }
-    WebviewWindowBuilder::new(app, label, url(route))
+    let b = WebviewWindowBuilder::new(app, label, url(route))
         .title(title)
         .inner_size(w, h)
         .min_inner_size(480.0, 360.0)
-        .center()
-        .build()
+        .center();
+    // macOS: unified title bar + toolbar (content draws under the traffic lights, like Preview).
+    #[cfg(target_os = "macos")]
+    let b = b.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
+    b.build()
 }
 
 pub fn close_prefixed(app: &AppHandle, prefix: &str) {

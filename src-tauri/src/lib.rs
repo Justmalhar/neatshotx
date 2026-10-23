@@ -83,17 +83,17 @@ fn enc(s: &str) -> String {
 }
 
 fn open_home(app: &AppHandle, tab: &str) -> Result<(), String> {
-    let w = windows::normal(app, "main", &format!("/home?tab={tab}"), "NeatShotX", 1000.0, 700.0).map_err(|e| e.to_string())?;
+    let w = windows::normal(app, "main", &format!("/home?tab={tab}"), "NeatShotX", 760.0, 640.0).map_err(|e| e.to_string())?;
     let _ = w.emit("nav", tab);
     Ok(())
 }
 
-fn open_editor_window(app: &AppHandle, path: &str) {
+pub fn open_editor_window(app: &AppHandle, path: &str) {
     let label = windows::next_label("editor");
     let _ = windows::normal(app, &label, &format!("/editor?p={}", enc(path)), "NeatShotX — Annotate", 1200.0, 800.0);
 }
 
-fn open_pin_window(app: &AppHandle, path: &str) {
+pub fn open_pin_window(app: &AppHandle, path: &str) {
     let (w, h) = image::image_dimensions(path).unwrap_or((400, 300));
     let scale = app.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0);
     let (lw, lh) = (w as f64 / scale, h as f64 / scale);

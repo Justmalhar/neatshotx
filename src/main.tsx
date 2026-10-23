@@ -1,4 +1,4 @@
-import { StrictMode, lazy, Suspense } from "react";
+import { Component, StrictMode, lazy, Suspense, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 
@@ -21,10 +21,28 @@ const name = location.hash.replace(/^#\/?/, "").split("?")[0] || "home";
 if (!opaque.has(name)) document.body.classList.add("transparent");
 const View = routes[name] ?? routes.home;
 
+/** A crashed view shows its error instead of a blank window. */
+class Boundary extends Component<{ children: ReactNode }, { error?: Error }> {
+  state: { error?: Error } = {};
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    const e = this.state.error;
+    if (!e) return this.props.children;
+    return (
+      <div className="mat-regular m-4 rounded-[var(--r-lg)] p-4 text-xs select-text">
+        <div className="t-headline mb-1">Something went wrong</div>
+        <pre className="whitespace-pre-wrap font-mono opacity-80">{e.message}{"\n"}{e.stack}</pre>
+      </div>
+    );
+  }
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Suspense fallback={null}>
-      <View />
-    </Suspense>
+    <Boundary>
+      <Suspense fallback={null}>
+        <View />
+      </Suspense>
+    </Boundary>
   </StrictMode>,
 );
