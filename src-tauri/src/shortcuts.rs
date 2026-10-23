@@ -6,7 +6,8 @@ pub fn register(app: &AppHandle) {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
     for (action, accel) in crate::settings::get(app).shortcuts {
-        if accel.trim().is_empty() {
+        // Skip empty bindings and actions that no longer exist (e.g. from an older settings.json).
+        if accel.trim().is_empty() || !crate::tray::is_action(&action) {
             continue;
         }
         let res = gs.on_shortcut(accel.as_str(), move |app, _, e| {

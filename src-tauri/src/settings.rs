@@ -46,7 +46,6 @@ impl Default for Settings {
             ("capture-previous-area", "Alt+Shift+4"),
             ("record-screen", "Alt+Shift+5"),
             ("scrolling-capture", "Alt+Shift+6"),
-            ("capture-text", "Alt+Shift+7"),
             ("self-timer", "Alt+Shift+8"),
         ]
         .into_iter()

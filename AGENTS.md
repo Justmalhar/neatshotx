@@ -11,7 +11,7 @@
   pixels elsewhere; `match_monitor` reconciles them with Tauri's physical positions. ffmpeg offsets use `Frozen.phys_origin`.
 - Frozen screenshots are served from memory through the custom `frozen://` protocol as BMP (no PNG encode latency).
 - Canvas export needs same-origin images: load files with `api.blobUrl()` (binary IPC), not `convertFileSrc`, wherever
-  pixels are read (editor, OCR). `convertFileSrc` is fine for display-only `<img>`/`<video>`.
+  pixels are read (editor). `convertFileSrc` is fine for display-only `<img>`/`<video>`.
 - `xcap` 0.9 getters return `Result` — always `unwrap_or` them.
 - Disk on the dev machine can be tight: dev profile has `debug = 0`. Don't re-enable without checking free space.
 - Tests: `cd src-tauri && cargo test --lib` (scroll stitcher, ffmpeg args). Frontend: `bunx tsc --noEmit`.

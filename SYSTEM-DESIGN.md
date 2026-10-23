@@ -2,7 +2,7 @@
 
 ## 1. Requirements
 
-**Functional:** capture area/window/fullscreen/previous/self-timer/scrolling, OCR, MP4/GIF recording with mic, webcam,
+**Functional:** capture area/window/fullscreen/previous/self-timer/scrolling, MP4/GIF recording with mic, webcam,
 clicks and keystrokes, Quick Access Overlay, annotate, pin, history, hide desktop icons, global shortcuts,
 URL scheme, launch at login. Full list in [PRD.md](PRD.md).
 
@@ -10,7 +10,7 @@ URL scheme, launch at login. Full list in [PRD.md](PRD.md).
 - Cross-platform: macOS 11+, Windows 10+, Linux (X11; Wayland partial).
 - Latency: overlay visible < 250 ms after the shortcut; clipboard < 300 ms after mouse-up.
 - Footprint: native webview (no Chromium bundle); idle RAM < 60 MB with no windows open.
-- Privacy: everything local. The only network access is the first-run OCR model download.
+- Privacy: everything local. No network access.
 - Cost: free, no backend.
 
 ## 2. High-level design
@@ -20,7 +20,7 @@ URL scheme, launch at login. Full list in [PRD.md](PRD.md).
  │ Tray menu ─┐                                     │        │ #/selector    frozen screen + loupe  │
  │ Shortcuts ─┼─► run_action(name) ──► capture.rs ──┼─emit──►│ #/quick-access overlay stack         │
  │ Deep link ─┤          │             record.rs    │◄invoke─│ #/editor      Konva annotate         │
- │ CLI args  ─┘          │             scroll.rs    │        │ #/pin #/ocr #/countdown              │
+ │ CLI args  ─┘          │             scroll.rs    │        │ #/pin #/countdown                    │
  │                       ▼             desktop.rs   │        │ #/record-bar #/scroll-bar #/webcam   │
  │                 windows.rs (builders) tray.rs    │        │ #/input-overlay  #/home (history/    │
  │ settings.rs (JSON in app config dir)             │        │                         settings)    │
@@ -33,7 +33,7 @@ URL scheme, launch at login. Full list in [PRD.md](PRD.md).
 
 ## 3. Low-level design
 
-### Capture flow (area / window / OCR / record / scroll / timer)
+### Capture flow (area / window / record / scroll / timer)
 1. `run_action` → thread → `capture::start_selection(mode)`.
 2. Optionally hide desktop icons; hide the Quick Access window; `xcap::Monitor::all()` → `capture_image()` per monitor →
    `CaptureState.frozen`.
@@ -43,7 +43,6 @@ URL scheme, launch at login. Full list in [PRD.md](PRD.md).
 5. Dispatch by mode:
    - `area`/`window` → crop frozen image (or `Window::capture_image` for true window pixels) → `handle_capture`.
    - `timer` → countdown window → live recapture of the region.
-   - `ocr` → temp PNG → `#/ocr` runs Tesseract.js → clipboard.
    - `record` → `record::start` (ffmpeg); `scroll` → `scroll::start`.
 6. `handle_capture`: write to `appData/history`, optionally copy to the save dir and the clipboard, emit `capture-added`,
    queue the path for Quick Access (`take_pending` pull avoids a create/emit race).
@@ -97,12 +96,10 @@ No database. Everything is on the filesystem:
 Rust: `tauri 2` (tray, asset protocol, macOS private API), `xcap` (capture), `image`, `device_query` (input overlay),
 `chrono`, `base64`, `objc2` (macOS window level), plus the `global-shortcut`, `clipboard-manager`,
 `dialog`, `opener`, `autostart`, `deep-link`, `single-instance` and `drag` plugins.
-JS: React 19, Vite, Tailwind v4, `konva`/`react-konva`, `tesseract.js`, `motion`, `lucide-react`, `@crabnebula/tauri-plugin-drag`.
+JS: React 19, Vite, Tailwind v4, `konva`/`react-konva`, `motion`, `lucide-react`, `@crabnebula/tauri-plugin-drag`.
 External: `ffmpeg` binary.
 
 ## 4. Known limits and upgrade paths
-- OCR downloads the English model from a CDN on first use. To work offline, bundle the traineddata or use native Vision /
-  Windows.Media.Ocr.
 - macOS/Windows computer audio needs ScreenCaptureKit / WASAPI loopback (native recorder) instead of ffmpeg.
 - The input overlay polls at 60 Hz and can miss sub-16 ms taps. OS hooks would fix that.
 - Wayland: xcap has partial support; ffmpeg x11grab does not work there. Use a PipeWire portal recorder.

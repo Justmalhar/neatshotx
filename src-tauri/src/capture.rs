@@ -199,11 +199,6 @@ pub async fn finish_selection(app: AppHandle, region: Region, window_id: Option<
     match mode.as_str() {
         "record" => crate::record::start(&app, region, phys_origin, xcap_index)?,
         "scroll" => crate::scroll::start(&app, region, xcap_index)?,
-        "ocr" => {
-            let path = std::env::temp_dir().join(format!("neatshotx-ocr-{}.png", chrono::Local::now().timestamp_millis()));
-            crop.save(&path).map_err(|e| e.to_string())?;
-            crate::open_ocr(&app, &path);
-        }
         "timer" => {
             *state(&app).last_region.lock().unwrap() = Some(region);
             let secs = settings::get(&app).self_timer_secs;

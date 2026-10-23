@@ -4,7 +4,7 @@ import { Resvg } from "@resvg/resvg-js";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const ICONS = [
-  "scan", "monitor", "app-window", "rotate-ccw-square", "arrow-down-to-line", "timer", "a-large-small",
+  "scan", "monitor", "app-window", "rotate-ccw-square", "arrow-down-to-line", "timer",
   "video", "eye-off", "eye", "pencil", "clipboard", "pin", "undo-2", "history",
 ];
 const out = "src-tauri/icons/menu";

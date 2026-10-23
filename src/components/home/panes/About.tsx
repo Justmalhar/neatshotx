@@ -12,7 +12,7 @@ export default function About() {
       <div className="grid h-20 w-20 place-items-center rounded-[18px] bg-gradient-to-b from-[#5ac8fa] to-[var(--accent)] text-white shadow-[var(--shadow-md)]"><Aperture size={44} strokeWidth={1.6} /></div>
       <h1 className="t-title mt-2">NeatShotX</h1>
       <p className="t-caption">Version {v || "—"}</p>
-      <p className="t-callout max-w-xs">A fast, cross-platform screenshot and screen-recording tool with annotation, scrolling capture and OCR.</p>
+      <p className="t-callout max-w-xs">A fast, cross-platform screenshot and screen-recording tool with annotation and scrolling capture.</p>
       <div className="mt-3 flex gap-2">
         <Btn onClick={() => openUrl("https://github.com/justmalhar")}>GitHub</Btn>
         <Btn onClick={() => openUrl("https://www.justmalhar.com")}>Website</Btn>

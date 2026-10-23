@@ -7,7 +7,6 @@ const routes: Record<string, React.LazyExoticComponent<() => React.JSX.Element |
   "quick-access": lazy(() => import("./views/QuickAccess")),
   editor: lazy(() => import("./views/Editor")),
   pin: lazy(() => import("./views/Pin")),
-  ocr: lazy(() => import("./views/Ocr")),
   countdown: lazy(() => import("./views/Countdown")),
   "record-bar": lazy(() => import("./views/RecordBar")),
   "scroll-bar": lazy(() => import("./views/ScrollBar")),

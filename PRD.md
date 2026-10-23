@@ -29,7 +29,6 @@ Derived from `Info.plist`, Mach-O strings and bundled resources of `/Application
 | Area / window / fullscreen / previous-area / self-timer capture | ✅ |
 | Frozen-screen selector, magnifier, dimensions, window hover | ✅ |
 | Scrolling capture (manual scroll, auto-stitch) | ✅ |
-| OCR to clipboard, line-break toggle | ✅ (Tesseract, English; downloads model on first use) |
 | Quick Access Overlay with drag-out | ✅ |
 | Annotate tools listed in README, background tool, undo/redo | ✅ |
 | Pin screenshots | ✅ |
@@ -42,7 +41,7 @@ Derived from `Info.plist`, Mach-O strings and bundled resources of `/Application
 - Automatic scrolling (synthetic scroll events), video trimmer/editor, pause/resume recording
 - Computer-audio capture on macOS/Windows (needs ScreenCaptureKit / WASAPI loopback)
 - Editable project file (`.cleanshot` equivalent), resize handles on shapes, snapping guides
-- Native OCR (Vision / Windows.Media.Ocr) for offline, multilingual accuracy
+- OCR / Capture Text (removed by decision)
 - Wayland capture/recording (xcap supports partial; ffmpeg x11grab does not)
 
 ## Success metrics

@@ -9,7 +9,6 @@ const ACTIONS: [string, string][] = [
   ["capture-previous-area", "Capture Previous Area"],
   ["record-screen", "Record Screen"],
   ["scrolling-capture", "Scrolling Capture"],
-  ["capture-text", "Capture Text (OCR)"],
   ["self-timer", "Self-Timer"],
 ];
 

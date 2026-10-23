@@ -22,7 +22,6 @@ pub const MENU: &[Entry] = &[
     Item { id: "capture-previous-area", label: "Capture Previous Area", icon: "rotate-ccw-square" },
     Item { id: "scrolling-capture", label: "Scrolling Capture", icon: "arrow-down-to-line" },
     Item { id: "self-timer", label: "Self-Timer", icon: "timer" },
-    Item { id: "capture-text", label: "Capture Text (OCR)", icon: "a-large-small" },
     Item { id: "record-screen", label: "Record Screen", icon: "video" },
     Sep,
     Item { id: "toggle-desktop-icons", label: "", icon: "" }, // label/icon depend on state
@@ -54,7 +53,7 @@ macro_rules! icons {
     };
 }
 icons!(
-    "scan", "monitor", "app-window", "rotate-ccw-square", "arrow-down-to-line", "timer", "a-large-small",
+    "scan", "monitor", "app-window", "rotate-ccw-square", "arrow-down-to-line", "timer",
     "video", "eye-off", "eye", "pencil", "clipboard", "pin", "undo-2", "history",
 );
 

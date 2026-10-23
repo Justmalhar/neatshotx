@@ -28,7 +28,6 @@ pub fn run_action(app: &AppHandle, action: &str) {
             "capture-window" => capture::start_selection(&app, "window"),
             "record-screen" | "record" => capture::start_selection(&app, "record"),
             "scrolling-capture" => capture::start_selection(&app, "scroll"),
-            "capture-text" => capture::start_selection(&app, "ocr"),
             "self-timer" => capture::start_selection(&app, "timer"),
             "capture-fullscreen" => capture::capture_fullscreen(&app),
             "capture-previous-area" => capture::capture_previous_area(&app),
@@ -105,13 +104,6 @@ pub fn open_pin_window(app: &AppHandle, path: &str) {
         .shadow(true)
         .resizable(true)
         .inner_size(lw * fit, lh * fit)
-        .center()
-        .build();
-}
-
-pub fn open_ocr(app: &AppHandle, path: &std::path::Path) {
-    let _ = windows::overlay(app, &windows::next_label("ocr"), &format!("/ocr?p={}", enc(&path.to_string_lossy())))
-        .inner_size(380.0, 220.0)
         .center()
         .build();
 }

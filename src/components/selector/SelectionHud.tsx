@@ -7,7 +7,7 @@ const HUD_W = 440; // estimate, only used to keep the pill on-screen
 const HUD_H = 40;
 const GAP = 12;
 
-const CONFIRM: Record<string, string> = { record: "Record", scroll: "Scroll", ocr: "Copy Text", timer: "Start", window: "Capture", area: "Capture" };
+const CONFIRM: Record<string, string> = { record: "Record", scroll: "Scroll", timer: "Start", window: "Capture", area: "Capture" };
 
 type Props = {
   rect: Rect;

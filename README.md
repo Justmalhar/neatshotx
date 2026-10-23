@@ -8,7 +8,6 @@ Built with **Tauri 2 (Rust)** + **React/TypeScript**. Lives in the menu bar / sy
 | Area | What you get |
 |---|---|
 | Capture | Area (frozen screen, crosshair + magnifier), Window (hover detect), Fullscreen (all monitors), Previous Area, Self-Timer, Scrolling Capture |
-| Text | Capture Text (OCR via Tesseract WASM) → clipboard, with/without line breaks |
 | Record | MP4 or GIF of any area, microphone, webcam bubble, click highlights, keystroke HUD |
 | After capture | Quick Access Overlay (copy, save/delete, drag-out, annotate, pin, convert to GIF), auto copy/save |
 | Annotate | Arrow, rectangle, filled rectangle, ellipse, line, pen, highlighter, text, counter, pixelate, blur, spotlight, emoji, crop, background (gradient/padding/radius/shadow), undo/redo |
@@ -41,7 +40,6 @@ cd src-tauri && cargo test   # Rust unit tests
 | Capture Previous Area | ⌥⇧4 |
 | Record Screen | ⌥⇧5 |
 | Scrolling Capture | ⌥⇧6 |
-| Capture Text (OCR) | ⌥⇧7 |
 | Self-Timer | ⌥⇧8 |
 
 In the selector: drag = area, **Space** = toggle window mode, **Esc**/right-click = cancel.
@@ -50,6 +48,6 @@ Editor: V A R F E L P H T N X B S J C select tools, ⌘Z / ⇧⌘Z, ⌘C copy, �
 ## URL scheme / CLI
 
 `neatshotx://capture-area`, `capture-fullscreen`, `capture-window`, `capture-previous-area`, `record-screen`,
-`scrolling-capture`, `capture-text`, `self-timer`, `annotate`, `open-from-clipboard`, `pin-image`,
+`scrolling-capture`, `self-timer`, `annotate`, `open-from-clipboard`, `pin-image`,
 `restore-recently-closed`, `toggle-desktop-icons`, `hide-desktop-icons`, `show-desktop-icons`, `open-history`, `open-settings`.
 The same names work as CLI arguments: `neatshotx capture-area`.
