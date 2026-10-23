@@ -69,3 +69,17 @@ git tag v0.1.0 && git push origin v0.1.0
 
 The Release workflow builds macOS (universal), Windows and Linux installers and attaches them to a
 **draft** GitHub release. Review it under Releases and click *Publish release*. Builds are unsigned.
+
+## Troubleshooting
+
+**macOS keeps asking for Screen Recording permission.** Builds are ad-hoc signed (no Apple Developer ID), so macOS
+ties the grant to that exact build. After installing a new version:
+
+```bash
+# quit NeatShotX first
+tccutil reset ScreenCapture com.justmalhar.neatshotx
+xattr -dr com.apple.quarantine /Applications/NeatShotX.app
+```
+
+Then open NeatShotX, take a screenshot, enable it in System Settings → Privacy & Security → Screen & System Audio
+Recording, and choose **Quit & Reopen** (the grant only applies after a relaunch).
