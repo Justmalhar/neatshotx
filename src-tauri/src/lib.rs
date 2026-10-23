@@ -4,13 +4,12 @@ mod record;
 mod scroll;
 mod settings;
 mod shortcuts;
+mod tray;
 mod upload;
 mod windows;
 
 use std::sync::Mutex;
 use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::TrayIconBuilder,
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, RunEvent,
 };
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -20,27 +19,6 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 /// Paths waiting to be shown in the Quick Access Overlay.
 #[derive(Default)]
 struct QuickAccessQueue(Mutex<Vec<String>>);
-
-const MENU: &[(&str, &str)] = &[
-    ("capture-area", "Capture Area"),
-    ("capture-fullscreen", "Capture Fullscreen"),
-    ("capture-window", "Capture Window"),
-    ("capture-previous-area", "Capture Previous Area"),
-    ("scrolling-capture", "Scrolling Capture"),
-    ("self-timer", "Self-Timer"),
-    ("capture-text", "Capture Text (OCR)"),
-    ("-", ""),
-    ("record-screen", "Record Screen / GIF"),
-    ("-", ""),
-    ("annotate", "Open Annotate Tool…"),
-    ("open-from-clipboard", "Annotate Image from Clipboard"),
-    ("pin-image", "Choose and Pin an Image…"),
-    ("restore-recently-closed", "Restore Recently Closed"),
-    ("toggle-desktop-icons", "Toggle Desktop Icons"),
-    ("-", ""),
-    ("open-history", "Capture History"),
-    ("open-settings", "Settings…"),
-];
 
 /// Single dispatch point for tray, shortcuts, deep links (neatshotx://<action>) and CLI args.
 pub fn run_action(app: &AppHandle, action: &str) {
@@ -55,9 +33,9 @@ pub fn run_action(app: &AppHandle, action: &str) {
             "self-timer" => capture::start_selection(&app, "timer"),
             "capture-fullscreen" => capture::capture_fullscreen(&app),
             "capture-previous-area" => capture::capture_previous_area(&app),
-            "toggle-desktop-icons" => desktop::set_icons_visible(desktop::icons_hidden()),
-            "hide-desktop-icons" => desktop::set_icons_visible(false),
-            "show-desktop-icons" => desktop::set_icons_visible(true),
+            "toggle-desktop-icons" => desktop::set_icons_visible(desktop::icons_hidden()).map(|_| tray::refresh(&app)),
+            "hide-desktop-icons" => desktop::set_icons_visible(false).map(|_| tray::refresh(&app)),
+            "show-desktop-icons" => desktop::set_icons_visible(true).map(|_| tray::refresh(&app)),
             "open-history" | "history" => open_home(&app, "history"),
             "open-settings" | "settings" => open_home(&app, "settings"),
             "annotate" | "open" => pick_image(&app).map(|p| open_editor_window(&app, &p)),
@@ -188,31 +166,10 @@ fn platform() -> &'static str {
 fn handle_args(app: &AppHandle, args: &[String]) {
     for a in args.iter().skip(1) {
         let name = a.strip_prefix("neatshotx://").unwrap_or(a).trim_end_matches('/');
-        if MENU.iter().any(|(id, _)| *id == name) || name.starts_with("capture") || name.starts_with("record") {
+        if tray::is_action(name) || name.starts_with("capture") || name.starts_with("record") {
             run_action(app, name);
         }
     }
-}
-
-fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let menu = Menu::new(app)?;
-    for (id, label) in MENU {
-        if *id == "-" {
-            menu.append(&PredefinedMenuItem::separator(app)?)?;
-        } else {
-            menu.append(&MenuItem::with_id(app, *id, *label, true, None::<&str>)?)?;
-        }
-    }
-    menu.append(&PredefinedMenuItem::separator(app)?)?;
-    menu.append(&MenuItem::with_id(app, "quit", "Quit NeatShotX", true, None::<&str>)?)?;
-    TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().unwrap().clone())
-        .icon_as_template(true)
-        .tooltip("NeatShotX")
-        .menu(&menu)
-        .on_menu_event(|app, e| run_action(app, e.id().as_ref()))
-        .build(app)?;
-    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -236,7 +193,7 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let handle = app.handle().clone();
             app.manage(settings::SettingsState(Mutex::new(settings::load(&handle))));
-            build_tray(&handle)?;
+            tray::build(&handle)?;
             shortcuts::register(&handle);
 
             #[cfg(any(windows, target_os = "linux"))]

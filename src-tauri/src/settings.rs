@@ -102,5 +102,6 @@ pub fn set_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     fs::write(&p, serde_json::to_vec_pretty(&settings).unwrap()).map_err(|e| e.to_string())?;
     *app.state::<SettingsState>().0.lock().unwrap() = settings;
     crate::shortcuts::register(&app);
+    crate::tray::refresh(&app); // shortcut hints in the menu
     Ok(())
 }
