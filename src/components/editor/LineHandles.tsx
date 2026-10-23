@@ -1,5 +1,6 @@
 import { Circle } from "react-konva";
 import type { Shape } from "./types";
+import { curveFromPoint, curveMid } from "./arrows";
 
 /** Draggable endpoint handles for arrows/lines (replaces the Transformer). Rendered on the overlay layer, so never exported. */
 export default function LineHandles({ s, scale, onChange, onEnd }: {
@@ -21,6 +22,11 @@ export default function LineHandles({ s, scale, onChange, onEnd }: {
     <>
       <Circle {...props} x={s.x} y={s.y} onDragMove={(e) => onChange(move(false)(e))} onDragEnd={(e) => onEnd(move(false)(e))} />
       <Circle {...props} x={s.x + s.w} y={s.y + s.h} onDragMove={(e) => onChange(move(true)(e))} onDragEnd={(e) => onEnd(move(true)(e))} />
+      {s.kind === "arrow" && s.arrowStyle === "curved" && (
+        <Circle {...props} x={s.x + curveMid(s).x} y={s.y + curveMid(s).y} fill="#0a84ff" stroke="#fff"
+          onDragMove={(e) => onChange({ ...s, curve: curveFromPoint(s, { x: e.target.x() - s.x, y: e.target.y() - s.y }) })}
+          onDragEnd={(e) => onEnd({ ...s, curve: curveFromPoint(s, { x: e.target.x() - s.x, y: e.target.y() - s.y }) })} />
+      )}
     </>
   );
 }

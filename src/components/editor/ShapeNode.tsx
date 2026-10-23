@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import Konva from "konva";
-import { Arrow, Circle, Ellipse, Group, Image as KImage, Line, Rect, Text } from "react-konva";
+import { Arrow, Circle, Shape as KShape, Ellipse, Group, Image as KImage, Line, Rect, Text } from "react-konva";
 import type { Shape } from "./types";
+import { arrowScene } from "./arrows";
 import { FONT, contrast, fontOf, measure, pill } from "./text";
 
 type Props = {
@@ -34,10 +35,14 @@ export default function ShapeNode({ s, unit, base, counter, draggable, onSelect,
     onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => onMove(e.target.x(), e.target.y()),
   };
   switch (s.kind) {
-    case "arrow":
-      return <Arrow {...common} points={[0, 0, s.w, s.h]} stroke={s.color} fill={s.color} strokeWidth={sw}
-        pointerLength={sw * 3.5} pointerWidth={sw * 3.5} lineCap="round" lineJoin="round" hitStrokeWidth={sw + 12}
-        shadowColor="black" shadowOpacity={0.25} shadowBlur={4 * unit} />;
+    case "arrow": {
+      const st = s.arrowStyle ?? "standard", fx = { shadowColor: "black", shadowOpacity: 0.25, shadowBlur: 4 * unit };
+      if (st === "standard" || st === "double")
+        return <Arrow {...common} points={s.arrowInverse ? [s.w, s.h, 0, 0] : [0, 0, s.w, s.h]} stroke={s.color} fill={s.color} strokeWidth={sw}
+          pointerLength={sw * 3.5} pointerWidth={sw * 3.5} pointerAtBeginning={st === "double"} lineCap="round" lineJoin="round" hitStrokeWidth={sw + 12} {...fx} />;
+      return <KShape {...common} sceneFunc={arrowScene(s, sw)} stroke={s.color} fill={s.color} lineCap="round" lineJoin="round"
+        strokeWidth={st === "tapered" ? sw * 0.3 : sw} hitStrokeWidth={Math.max(sw, 0) + 12} {...fx} />;
+    }
     case "line":
       return <Line {...common} points={[0, 0, s.w, s.h]} stroke={s.color} strokeWidth={sw} lineCap="round" hitStrokeWidth={sw + 12} />;
     case "rect":

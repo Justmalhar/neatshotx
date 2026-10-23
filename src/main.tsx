@@ -8,10 +8,7 @@ const routes: Record<string, React.LazyExoticComponent<() => React.JSX.Element |
   editor: lazy(() => import("./views/Editor")),
   pin: lazy(() => import("./views/Pin")),
   countdown: lazy(() => import("./views/Countdown")),
-  "record-bar": lazy(() => import("./views/RecordBar")),
   "scroll-bar": lazy(() => import("./views/ScrollBar")),
-  webcam: lazy(() => import("./views/Webcam")),
-  "input-overlay": lazy(() => import("./views/InputOverlay")),
   home: lazy(() => import("./views/Home")),
 };
 const opaque = new Set(["editor", "home", "pin"]);

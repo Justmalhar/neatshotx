@@ -14,8 +14,6 @@ pub struct Frozen {
     pub xcap_index: usize,
     /// Monitor origin/size in xcap's coordinate space (points on macOS, pixels elsewhere).
     pub xcap_rect: (i32, i32, u32, u32),
-    /// Monitor origin in physical desktop pixels (Tauri), used for ffmpeg offsets.
-    pub phys_origin: (i32, i32),
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
@@ -74,7 +72,7 @@ pub fn start_selection(app: &AppHandle, mode: &str) -> Result<(), String> {
         let (pos, size) = tm
             .map(|t| (*t.position(), *t.size()))
             .unwrap_or((PhysicalPosition::new(rect.0, rect.1), PhysicalSize::new(image.width(), image.height())));
-        frozen.push((Frozen { image, xcap_index: i, xcap_rect: rect, phys_origin: (pos.x, pos.y) }, pos, size));
+        frozen.push((Frozen { image, xcap_index: i, xcap_rect: rect }, pos, size));
     }
     if let Some(w) = qa {
         let _ = w.show();
@@ -189,16 +187,15 @@ pub async fn cancel_selection(app: AppHandle) {
 pub async fn finish_selection(app: AppHandle, region: Region, window_id: Option<u32>) -> Result<(), String> {
     end_selection(&app);
     let mode = state(&app).mode.lock().unwrap().clone();
-    let (crop, phys_origin, xcap_index) = {
+    let (crop, xcap_index, xcap_rect, image_w) = {
         let st = state(&app).frozen.lock().unwrap();
         let f = st.get(region.monitor).ok_or("no frozen monitor")?;
         let r = clamp(region, f.image.width(), f.image.height());
-        (imageops::crop_imm(&f.image, r.x, r.y, r.w, r.h).to_image(), f.phys_origin, f.xcap_index)
+        (imageops::crop_imm(&f.image, r.x, r.y, r.w, r.h).to_image(), f.xcap_index, f.xcap_rect, f.image.width())
     };
     let region = clamp(region, u32::MAX, u32::MAX);
     match mode.as_str() {
-        "record" => crate::record::start(&app, region, phys_origin, xcap_index)?,
-        "scroll" => crate::scroll::start(&app, region, xcap_index)?,
+        "scroll" => crate::scroll::start(&app, region, xcap_index, xcap_rect, image_w)?,
         "timer" => {
             *state(&app).last_region.lock().unwrap() = Some(region);
             let secs = settings::get(&app).self_timer_secs;
@@ -300,25 +297,17 @@ pub fn handle_capture(app: &AppHandle, img: RgbaImage) -> Result<PathBuf, String
     Ok(path)
 }
 
-/// After-capture actions for a finished screenshot or recording (the Settings matrix).
+/// After-capture actions for a finished screenshot (the Settings matrix).
 pub fn announce(app: &AppHandle, path: &std::path::Path) {
     let s = settings::get(app);
     let p = path.to_string_lossy().to_string();
-    let is_video = matches!(path.extension().and_then(|e| e.to_str()), Some("mp4" | "gif" | "mov"));
-    let quick_access = if is_video {
-        if s.recording_save && !s.save_dir.is_empty() {
-            let _ = std::fs::copy(path, PathBuf::from(&s.save_dir).join(path.file_name().unwrap()));
-        }
-        s.recording_quick_access
-    } else {
-        if s.screenshot_annotate {
-            crate::open_editor_window(app, &p);
-        }
-        if s.screenshot_pin {
-            crate::open_pin_window(app, &p);
-        }
-        s.show_quick_access
-    };
+    if s.screenshot_annotate {
+        crate::open_editor_window(app, &p);
+    }
+    if s.screenshot_pin {
+        crate::open_pin_window(app, &p);
+    }
+    let quick_access = s.show_quick_access;
     let _ = app.emit("capture-added", &p);
     if quick_access {
         crate::open_quick_access(app, &p);

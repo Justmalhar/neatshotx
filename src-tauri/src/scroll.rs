@@ -1,4 +1,4 @@
-//! Scrolling capture: grab the region repeatedly while the user scrolls, stitch by row matching.
+//! Scrolling capture: grab the region repeatedly while it scrolls (automatically or by hand), stitch by row matching.
 use image::{imageops, RgbaImage};
 use std::{
     sync::{
@@ -18,37 +18,126 @@ pub struct ScrollState {
     result: Arc<Mutex<Option<RgbaImage>>>,
 }
 
-pub fn start(app: &AppHandle, r: capture::Region, xcap_index: usize) -> Result<(), String> {
+pub fn start(app: &AppHandle, r: capture::Region, xcap_index: usize, xcap_rect: (i32, i32, u32, u32), image_w: u32) -> Result<(), String> {
     let st = app.state::<ScrollState>();
-    st.running.store(true, Ordering::SeqCst);
+    if st.running.swap(true, Ordering::SeqCst) {
+        return Err("A scrolling capture is already running".into());
+    }
     *st.result.lock().unwrap() = None;
-    let _ = windows::overlay(app, "scroll-bar", "/scroll-bar")
+    // The bar is the only way to stop a manual session — never run without it.
+    if let Some(old) = app.get_webview_window("scroll-bar") {
+        let _ = old.destroy();
+    }
+    if let Err(e) = windows::overlay(app, "scroll-bar", "/scroll-bar")
         .inner_size(320.0, 56.0)
         .position(24.0, 24.0)
         .focused(false)
-        .build();
+        .build()
+    {
+        st.running.store(false, Ordering::SeqCst);
+        return Err(e.to_string());
+    }
+    // Park the cursor just inside the region's right edge (usually padding/scrollbar, so fewer hover
+    // effects than the centre). OS cursor space = xcap_rect space (points on macOS, pixels elsewhere).
+    let k = xcap_rect.2 as f64 / image_w.max(1) as f64;
+    let centre = (
+        xcap_rect.0 + ((r.x + r.w) as f64 * k) as i32 - 8,
+        xcap_rect.1 + ((r.y + r.h / 2) as f64 * k) as i32,
+    );
+    let auto = crate::settings::get(app).scroll_auto;
     let (running, result, app) = (st.running.clone(), st.result.clone(), app.clone());
     thread::spawn(move || {
-        let mut stitched: Option<RgbaImage> = None;
-        let mut last: Option<RgbaImage> = None;
+        let mut scroller = auto.then(|| AutoScroller::new(centre)).flatten();
+        let _ = app.emit_to("scroll-bar", "scroll-mode", if scroller.is_some() { "auto" } else { "manual" });
+        let (mut stitched, mut last): (Option<RgbaImage>, Option<RgbaImage>) = (None, None);
+        let mut misses = 0;
         while running.load(Ordering::SeqCst) {
             if let Ok(frame) = capture::capture_live(xcap_index, r) {
+                let mut moved = None;
                 match (&mut stitched, &last) {
                     (Some(out), Some(prev)) => {
                         if let Some(dy) = find_offset(prev, &frame) {
                             append_rows(out, &frame, dy);
+                            moved = Some(dy);
                             let _ = app.emit_to("scroll-bar", "scroll-progress", out.height());
                         }
                     }
                     _ => stitched = Some(frame.clone()),
                 }
                 last = Some(frame);
+                if let Some(sc) = scroller.as_mut() {
+                    misses = if moved.is_some() { 0 } else { misses + 1 };
+                    let height = stitched.as_ref().map_or(0, |i| i.height());
+                    // Hover effects under the parked cursor can spoil a frame or two; only 5 misses in a row means "bottom".
+                    if misses >= 5 || height >= MAX_HEIGHT {
+                        if height <= r.h {
+                            // Nothing moved at all: input injection is blocked (macOS Accessibility) or
+                            // the area isn't scrollable. Fall back to manual scrolling.
+                            scroller = None;
+                            let _ = app.emit_to("scroll-bar", "scroll-mode", "manual-fallback");
+                            continue;
+                        }
+                        break; // reached the bottom
+                    }
+                    sc.step(moved, r.h);
+                }
             }
-            thread::sleep(Duration::from_millis(120));
+            thread::sleep(Duration::from_millis(if scroller.is_some() { 220 } else { 120 }));
         }
-        *result.lock().unwrap() = stitched;
+        let auto_finished = running.swap(false, Ordering::SeqCst);
+        drop(scroller); // restores the cursor
+        if auto_finished {
+            // Auto mode hit the bottom: finish without waiting for the user.
+            if let Some(w) = app.get_webview_window("scroll-bar") {
+                let _ = w.destroy();
+            }
+            if let Some(img) = stitched {
+                let _ = capture::handle_capture(&app, img);
+            }
+        } else {
+            *result.lock().unwrap() = stitched;
+        }
     });
     Ok(())
+}
+
+const MAX_HEIGHT: u32 = 40_000;
+
+/// Drives the scroll wheel over the captured area (CleanShot's "automatic scrolling").
+struct AutoScroller {
+    enigo: enigo::Enigo,
+    restore: Option<(i32, i32)>,
+    lines: i32,
+}
+
+impl AutoScroller {
+    fn new(centre: (i32, i32)) -> Option<Self> {
+        use enigo::{Coordinate, Enigo, Mouse, Settings};
+        let mut enigo = Enigo::new(&Settings::default()).ok()?;
+        let restore = enigo.location().ok();
+        enigo.move_mouse(centre.0, centre.1, Coordinate::Abs).ok()?;
+        thread::sleep(Duration::from_millis(250));
+        Some(Self { enigo, restore, lines: 3 })
+    }
+
+    /// Scroll, adapting the step so each frame overlaps ~2/3 of the previous one (keeps stitching reliable).
+    fn step(&mut self, moved: Option<u32>, view_h: u32) {
+        use enigo::{Axis, Mouse};
+        if let Some(dy) = moved.filter(|d| *d > 0) {
+            let target = view_h as f64 / 3.0;
+            self.lines = ((self.lines as f64 * target / dy as f64).round() as i32).clamp(1, 15);
+        }
+        let _ = self.enigo.scroll(self.lines, Axis::Vertical);
+    }
+}
+
+impl Drop for AutoScroller {
+    fn drop(&mut self) {
+        use enigo::{Coordinate, Mouse};
+        if let Some((x, y)) = self.restore {
+            let _ = self.enigo.move_mouse(x, y, Coordinate::Abs);
+        }
+    }
 }
 
 #[tauri::command]
@@ -92,26 +181,37 @@ fn band_cost(a: &RgbaImage, ay: u32, b: &RgbaImage, by: u32, best: u64) -> u64 {
     cost
 }
 
-/// How many pixels the content moved up between `prev` and `cur`.
-/// Matches a band from `cur` (below any sticky header) inside `prev`.
-/// Returns None when nothing moved or no confident match was found.
-pub fn find_offset(prev: &RgbaImage, cur: &RgbaImage) -> Option<u32> {
+/// Best match of `cur`'s band at row `s` inside `prev` → (dy, mean luma diff).
+fn match_band(prev: &RgbaImage, cur: &RgbaImage, s: u32) -> (u32, u64) {
     let h = cur.height();
-    if prev.dimensions() != cur.dimensions() || h < BAND * 4 {
-        return None;
-    }
-    let s = h / 4;
     let samples = (BAND / 2) as u64 * cur.width().div_ceil(STEP) as u64;
-    let mut best = (u64::MAX, 0u32);
+    let mut best = (u64::MAX, s);
     for p in s..=(h - BAND) {
         let c = band_cost(cur, s, prev, p, best.0);
         if c < best.0 {
             best = (c, p);
         }
     }
-    let dy = best.1 - s;
+    (best.1 - s, best.0 / samples.max(1))
+}
+
+/// How many pixels the content moved up between `prev` and `cur`, or None if nothing moved / no
+/// confident match. Three bands are matched so a sticky header or a hover animation spoiling one
+/// band doesn't break stitching: two agreeing bands win, else the most confident moving band.
+pub fn find_offset(prev: &RgbaImage, cur: &RgbaImage) -> Option<u32> {
+    let h = cur.height();
+    if prev.dimensions() != cur.dimensions() || h < BAND * 4 {
+        return None;
+    }
     // ponytail: fixed threshold (avg luma diff < 6); make adaptive if noisy UIs misalign.
-    (dy > 0 && best.0 / samples.max(1) < 6).then_some(dy)
+    let mut moving: Vec<(u32, u64)> = [h / 5, h / 3, h / 2]
+        .into_iter()
+        .map(|s| match_band(prev, cur, s))
+        .filter(|&(dy, cost)| dy > 0 && cost < 6)
+        .collect();
+    moving.sort_by_key(|&(_, cost)| cost);
+    let agreed = moving.iter().find(|a| moving.iter().filter(|b| a.0.abs_diff(b.0) <= 2).count() >= 2);
+    agreed.or(moving.first()).map(|&(dy, _)| dy)
 }
 
 pub fn append_rows(out: &mut RgbaImage, frame: &RgbaImage, dy: u32) {
@@ -151,5 +251,19 @@ mod tests {
         }
         assert_eq!(out.height(), 700);
         assert_eq!(out, imageops::crop_imm(&page, 0, 0, 120, 700).to_image());
+    }
+
+    #[test]
+    fn sticky_header_does_not_break_offset() {
+        let page = noise(120, 900);
+        let header = noise(120, 40).iter().map(|p| 255 - p).collect::<Vec<u8>>();
+        let header = RgbaImage::from_raw(120, 40, header).unwrap();
+        let view = |y| {
+            let mut v = imageops::crop_imm(&page, 0, y, 120, 300).to_image();
+            imageops::replace(&mut v, &header, 0, 0); // fixed header painted over the top
+            v
+        };
+        assert_eq!(find_offset(&view(0), &view(55)), Some(55));
+        assert_eq!(find_offset(&view(55), &view(55)), None);
     }
 }

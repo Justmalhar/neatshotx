@@ -10,22 +10,12 @@ export type Settings = {
   show_quick_access: boolean;
   self_timer_secs: number;
   hide_desktop_icons_while_capturing: boolean;
-  record_fps: number;
-  record_mic: boolean;
-  record_mic_device: string;
-  record_system_audio: boolean;
-  record_show_clicks: boolean;
-  record_show_keys: boolean;
-  record_webcam: boolean;
   screenshot_annotate: boolean;
   screenshot_pin: boolean;
-  recording_quick_access: boolean;
-  recording_save: boolean;
-  record_countdown: boolean;
-  keystrokes_only_modifiers: boolean;
   qa_position: "left" | "right";
   qa_auto_close_secs: number;
   qa_close_after_drag: boolean;
+  scroll_auto: boolean;
   selector_remember_last: boolean;
   selector_show_magnifier: boolean;
   play_sounds: boolean;
@@ -43,9 +33,6 @@ export const api = {
   listHistory: () => invoke<string[]>("list_history"),
   deleteCapture: (path: string) => invoke("delete_capture", { path }),
   copyFile: (src: string, dest: string) => invoke("copy_file", { src, dest }),
-  stopRecording: (asGif: boolean) => invoke<string>("stop_recording", { asGif }),
-  cancelRecording: () => invoke("cancel_recording"),
-  convertToGif: (path: string) => invoke<string>("convert_to_gif", { path }),
   finishScroll: (keep: boolean) => invoke("finish_scroll", { keep }),
   takePending: () => invoke<string[]>("take_pending"),
   qaResize: (height: number) => invoke("qa_resize", { height }),
@@ -65,7 +52,5 @@ export const api = {
 };
 
 export const fileSrc = (path: string) => convertFileSrc(path);
-export const isVideo = (p: string) => /\.(mp4|mov|webm)$/i.test(p);
-export const isGif = (p: string) => /\.gif$/i.test(p);
 export const fileName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 export const param = (k: string) => new URLSearchParams(location.hash.split("?")[1] ?? "").get(k);

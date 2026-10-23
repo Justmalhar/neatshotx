@@ -1,6 +1,5 @@
 mod capture;
 mod desktop;
-mod record;
 mod scroll;
 mod settings;
 mod shortcuts;
@@ -26,7 +25,6 @@ pub fn run_action(app: &AppHandle, action: &str) {
         let res: Result<(), String> = match action.as_str() {
             "capture-area" => capture::start_selection(&app, "area"),
             "capture-window" => capture::start_selection(&app, "window"),
-            "record-screen" | "record" => capture::start_selection(&app, "record"),
             "scrolling-capture" => capture::start_selection(&app, "scroll"),
             "self-timer" => capture::start_selection(&app, "timer"),
             "capture-fullscreen" => capture::capture_fullscreen(&app),
@@ -185,7 +183,7 @@ fn platform() -> &'static str {
 fn handle_args(app: &AppHandle, args: &[String]) {
     for a in args.iter().skip(1) {
         let name = a.strip_prefix("neatshotx://").unwrap_or(a).trim_end_matches('/');
-        if tray::is_action(name) || name.starts_with("capture") || name.starts_with("record") {
+        if tray::is_action(name) || name.starts_with("capture") {
             run_action(app, name);
         }
     }
@@ -203,7 +201,6 @@ pub fn run() {
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .manage(capture::CaptureState::default())
-        .manage(record::RecState::default())
         .manage(scroll::ScrollState::default())
         .manage(QuickAccessQueue::default())
         .register_uri_scheme_protocol("frozen", |ctx, req| capture::serve_frozen(ctx.app_handle(), req.uri().path()))
@@ -244,9 +241,6 @@ pub fn run() {
             capture::copy_png,
             capture::clear_history,
             capture::last_region,
-            record::stop_recording,
-            record::cancel_recording,
-            record::convert_to_gif,
             scroll::finish_scroll,
             take_pending,
             qa_resize,

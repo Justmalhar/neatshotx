@@ -20,6 +20,12 @@ export type Shape = {
   fontSize?: number;
   /** Text background style. */
   bg?: "none" | "solid";
+  /** Arrow variants; undefined = "standard". */
+  arrowStyle?: "standard" | "tapered" | "curved" | "double" | "line-dot";
+  /** Head at the start point instead of the end. */
+  arrowInverse?: boolean;
+  /** Bend for curved arrows, -1…1 (default 0.35). */
+  curve?: number;
 };
 
 /* ── Background (CleanShot-style). Contract shared by the editor shell and components/editor/background/*. ── */

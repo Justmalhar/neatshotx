@@ -10,7 +10,6 @@ import { useSettings } from "../components/home/useSettings";
 import General from "../components/home/panes/General";
 import Shortcuts from "../components/home/panes/Shortcuts";
 import QuickAccess from "../components/home/panes/QuickAccess";
-import Recording from "../components/home/panes/Recording";
 import Screenshots from "../components/home/panes/Screenshots";
 import About from "../components/home/panes/About";
 
@@ -37,7 +36,6 @@ export default function Home() {
     : tab === "general" ? <General {...ctl} />
     : tab === "shortcuts" ? <Shortcuts {...ctl} />
     : tab === "quick-access" ? <QuickAccess {...ctl} />
-    : tab === "recording" ? <Recording {...ctl} />
     : <Screenshots {...ctl} />;
 
   return (

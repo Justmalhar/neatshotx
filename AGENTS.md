@@ -8,11 +8,11 @@
 - Window creation must not happen inside a *sync* Tauri command (deadlocks on Windows). Commands that open windows are `async`;
   `run_action` spawns a thread.
 - Coordinates: the selector works in **frozen-image pixels** (`Region`). xcap monitor/window rects are points on macOS and
-  pixels elsewhere; `match_monitor` reconciles them with Tauri's physical positions. ffmpeg offsets use `Frozen.phys_origin`.
+  pixels elsewhere; `match_monitor` reconciles them with Tauri's physical positions. Auto-scroll converts region centre to cursor space via `xcap_rect`.
 - Frozen screenshots are served from memory through the custom `frozen://` protocol as BMP (no PNG encode latency).
 - Canvas export needs same-origin images: load files with `api.blobUrl()` (binary IPC), not `convertFileSrc`, wherever
   pixels are read (editor). `convertFileSrc` is fine for display-only `<img>`/`<video>`.
 - `xcap` 0.9 getters return `Result` — always `unwrap_or` them.
 - Disk on the dev machine can be tight: dev profile has `debug = 0`. Don't re-enable without checking free space.
-- Tests: `cd src-tauri && cargo test --lib` (scroll stitcher, ffmpeg args). Frontend: `bunx tsc --noEmit`.
-- Recording depends on a system ffmpeg (`record::ffmpeg()` searches Homebrew paths then PATH). Bundling as a sidecar is a TODO.
+- Tests: `cd src-tauri && cargo test --lib` (scroll stitcher). Frontend: `bunx tsc --noEmit`.
+- Recording, OCR and cloud upload were removed on purpose (install/permission burden). Don't reintroduce ffmpeg or network deps without asking.

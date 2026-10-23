@@ -8,13 +8,12 @@ import { Caption, Checkbox, PopUp, Section } from "../form";
 import type { PaneProps } from "./types";
 
 const mac = /Mac/.test(navigator.platform);
-// [label, screenshot key, recording key | null]
-const AFTER: [string, keyof Settings, keyof Settings | null][] = [
-  ["Show Quick Access Overlay", "show_quick_access", "recording_quick_access"],
-  ["Copy file to clipboard", "copy_after_capture", null],
-  ["Save", "save_after_capture", "recording_save"],
-  ["Open Annotate tool", "screenshot_annotate", null],
-  ["Pin to the screen", "screenshot_pin", null],
+const AFTER: [string, keyof Settings][] = [
+  ["Show Quick Access Overlay", "show_quick_access"],
+  ["Copy file to clipboard", "copy_after_capture"],
+  ["Save", "save_after_capture"],
+  ["Open Annotate tool", "screenshot_annotate"],
+  ["Pin to the screen", "screenshot_pin"],
 ];
 
 export default function General({ s, set }: PaneProps) {
@@ -45,15 +44,14 @@ export default function General({ s, set }: PaneProps) {
         <PopUp label="Image format" className="w-24" value={s.image_format} options={[["png", "PNG"], ["jpg", "JPG"]]} onChange={(v) => set("image_format", v)} />
       </Section>
       <Section label="After capture:">
-        <Caption>Here you can decide what should happen after taking a screenshot or recording a video.</Caption>
-        <div className="w-full max-w-[460px] overflow-hidden rounded-[6px] shadow-[inset_0_0_0_0.5px_var(--separator)] ring-[0.5px] ring-[var(--separator)]">
-          <div className="grid grid-cols-[84px_84px_1fr] border-b border-[var(--separator)] px-3 py-1 font-medium">
-            <span>Screenshot</span><span>Recording</span><span>Action</span>
+        <Caption>Here you can decide what should happen after taking a screenshot.</Caption>
+        <div className="w-full max-w-[380px] overflow-hidden rounded-[6px] shadow-[inset_0_0_0_0.5px_var(--separator)] ring-[0.5px] ring-[var(--separator)]">
+          <div className="grid grid-cols-[84px_1fr] border-b border-[var(--separator)] px-3 py-1 font-medium">
+            <span>Screenshot</span><span>Action</span>
           </div>
-          {AFTER.map(([label, shot, rec], i) => (
-            <div key={label} className={`grid grid-cols-[84px_84px_1fr] items-center px-3 py-1.5 ${i % 2 ? "" : "bg-[var(--fill)]"}`}>
+          {AFTER.map(([label, shot], i) => (
+            <div key={label} className={`grid grid-cols-[84px_1fr] items-center px-3 py-1.5 ${i % 2 ? "" : "bg-[var(--fill)]"}`}>
               <span><Checkbox checked={flag(shot)} onChange={(v) => set(shot, v as never)} /></span>
-              <span>{rec ? <Checkbox checked={flag(rec)} onChange={(v) => set(rec, v as never)} /> : <span className="pl-1 text-[var(--label-3)]">–</span>}</span>
               <span>{label}</span>
             </div>
           ))}

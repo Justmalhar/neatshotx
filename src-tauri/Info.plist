@@ -3,7 +3,5 @@
 <plist version="1.0">
 <dict>
   <key>LSUIElement</key><true/>
-  <key>NSCameraUsageDescription</key><string>NeatShotX uses the camera only for the webcam overlay during recordings.</string>
-  <key>NSMicrophoneUsageDescription</key><string>NeatShotX records your microphone only during recordings.</string>
 </dict>
 </plist>

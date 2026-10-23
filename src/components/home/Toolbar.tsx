@@ -1,13 +1,12 @@
 import { useId } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Camera, Command, History, Info, MousePointerSquareDashed, Settings, Video, type LucideIcon } from "lucide-react";
+import { Camera, Command, History, Info, MousePointerSquareDashed, Settings, type LucideIcon } from "lucide-react";
 import { spring } from "../../lib/motion";
 
 export const TABS = [
   { id: "general", label: "General", Icon: Settings },
   { id: "shortcuts", label: "Shortcuts", Icon: Command },
   { id: "quick-access", label: "Quick Access", Icon: MousePointerSquareDashed },
-  { id: "recording", label: "Recording", Icon: Video },
   { id: "screenshots", label: "Screenshots", Icon: Camera },
   { id: "history", label: "History", Icon: History },
   { id: "about", label: "About", Icon: Info },

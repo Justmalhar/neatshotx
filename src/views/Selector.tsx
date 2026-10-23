@@ -10,12 +10,11 @@ import Handles from "../components/selector/Handles";
 import Loupe from "../components/selector/Loupe";
 import SelectionHud from "../components/selector/SelectionHud";
 
-// Short top hint, record/scroll only (CleanShot shows nothing for the instant-capture modes).
+// Short top hint, scroll only (CleanShot shows nothing for the instant-capture modes).
 const MODE_HINT: Record<string, string> = {
-  record: "Drag the area to record · Esc to cancel",
   scroll: "Drag the scrollable area · Esc to cancel",
 };
-const KEEP_EDITING = ["record", "scroll"]; // release keeps an editable selection + HUD; other modes confirm on release
+const KEEP_EDITING = ["scroll"]; // release keeps an editable selection + HUD; other modes confirm on release
 const FRAME = "0 0 0 1px rgba(255,255,255,.95), 0 0 0 2px rgba(0,0,0,.3)";
 const LBL_W = 112, LBL_H = 24;
 

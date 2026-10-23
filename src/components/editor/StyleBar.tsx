@@ -7,8 +7,10 @@ import ColorWell from "./ColorWell";
 import Popover from "./Popover";
 import Tip from "./Tip";
 import { cap } from "./IconButton";
+import ArrowGlyph from "./ArrowGlyph";
+import { ARROW_STYLES, type ArrowStyle } from "./arrows";
 
-export type StyleValues = { color: string; size: number; emoji: string; textBg: "none" | "solid"; counterStart: number };
+export type StyleValues = { color: string; size: number; emoji: string; textBg: "none" | "solid"; counterStart: number; arrowStyle: ArrowStyle; arrowInverse: boolean };
 export type StylePatch = Partial<StyleValues>;
 
 const COLOR = ["arrow", "line", "rect", "filled", "ellipse", "pen", "highlighter", "text", "counter"];
@@ -57,6 +59,38 @@ export default function StyleBar({ kind, v, onChange }: { kind: Tool; v: StyleVa
   const items: ReactNode[] = [];
   if (COLOR.includes(kind)) items.push(<ColorWell color={v.color} onChange={(color) => onChange({ color })} />);
   if (SIZE.includes(kind)) items.push(<SizeButton kind={kind} size={v.size} onChange={(size) => onChange({ size })} />);
+  if (kind === "arrow") items.push(
+    <Popover trigger={({ open, toggle }) => (
+      <Tip label="Arrow style">
+        <button className={cap + " w-[68px] gap-1.5"} aria-pressed={open} onClick={toggle} aria-label="Arrow style">
+          <ArrowGlyph style={v.arrowStyle} inverse={v.arrowInverse} className="h-4 w-[30px]" />
+          <ChevronDown size={13} strokeWidth={2.5} className="text-[var(--label-2)]" />
+        </button>
+      </Tip>
+    )}>
+      {() => (
+        <div className="flex w-[210px] flex-col gap-1">
+          <div className="grid grid-cols-2 gap-1">
+            {ARROW_STYLES.map((a) => (
+              <motion.button key={a.id} whileTap={{ scale: 0.96 }} transition={spring.press} aria-label={a.label} title={a.label}
+                onClick={() => onChange({ arrowStyle: a.id })} aria-pressed={v.arrowStyle === a.id}
+                className="grid h-10 place-items-center rounded-[var(--r-md,10px)] text-[var(--label)]"
+                style={{ boxShadow: v.arrowStyle === a.id ? "inset 0 0 0 2px var(--accent)" : "inset 0 0 0 0.5px var(--separator)" }}>
+                <ArrowGlyph style={a.id} inverse={v.arrowInverse} />
+              </motion.button>
+            ))}
+          </div>
+          <button className="btn w-full justify-between !px-2" role="switch" aria-checked={v.arrowInverse}
+            onClick={() => onChange({ arrowInverse: !v.arrowInverse })}>
+            <span className="text-xs">Inverse direction</span>
+            <span className="relative h-5 w-9 rounded-full transition-colors" style={{ background: v.arrowInverse ? "var(--accent)" : "var(--fill-2)" }}>
+              <span className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all" style={{ left: v.arrowInverse ? 18 : 2 }} />
+            </span>
+          </button>
+        </div>
+      )}
+    </Popover>,
+  );
   if (kind === "text") items.push(
     <div className={cap + " gap-0 p-[3px]"}>
       {(["none", "solid"] as const).map((b) => (

@@ -7,7 +7,6 @@ const ACTIONS: [string, string][] = [
   ["capture-area", "Capture Area"],
   ["capture-window", "Capture Window"],
   ["capture-previous-area", "Capture Previous Area"],
-  ["record-screen", "Record Screen"],
   ["scrolling-capture", "Scrolling Capture"],
   ["self-timer", "Self-Timer"],
 ];

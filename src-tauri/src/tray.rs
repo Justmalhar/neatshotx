@@ -22,7 +22,6 @@ pub const MENU: &[Entry] = &[
     Item { id: "capture-previous-area", label: "Capture Previous Area", icon: "rotate-ccw-square" },
     Item { id: "scrolling-capture", label: "Scrolling Capture", icon: "arrow-down-to-line" },
     Item { id: "self-timer", label: "Self-Timer", icon: "timer" },
-    Item { id: "record-screen", label: "Record Screen", icon: "video" },
     Sep,
     Item { id: "toggle-desktop-icons", label: "", icon: "" }, // label/icon depend on state
     Sep,
@@ -54,7 +53,7 @@ macro_rules! icons {
 }
 icons!(
     "scan", "monitor", "app-window", "rotate-ccw-square", "arrow-down-to-line", "timer",
-    "video", "eye-off", "eye", "pencil", "clipboard", "pin", "undo-2", "history",
+    "eye-off", "eye", "pencil", "clipboard", "pin", "undo-2", "history",
 );
 
 /// True when menus render dark, so icons must be light. Win32/GTK tray menus default to light.
@@ -99,7 +98,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let about = AboutMetadata {
         name: Some("NeatShotX".into()),
         version: Some(app.package_info().version.to_string()),
-        comments: Some("Cross-platform screenshots & recordings".into()),
+        comments: Some("Cross-platform screenshots".into()),
         ..Default::default()
     };
     menu.append(&PredefinedMenuItem::about(app, Some("About NeatShotX…"), Some(about))?)?;

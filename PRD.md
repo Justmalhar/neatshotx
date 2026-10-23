@@ -28,23 +28,23 @@ Derived from `Info.plist`, Mach-O strings and bundled resources of `/Application
 |---|---|
 | Area / window / fullscreen / previous-area / self-timer capture | ✅ |
 | Frozen-screen selector, magnifier, dimensions, window hover | ✅ |
-| Scrolling capture (manual scroll, auto-stitch) | ✅ |
+| Scrolling capture (automatic scrolling with manual fallback, auto-stitch) | ✅ |
 | Quick Access Overlay with drag-out | ✅ |
 | Annotate tools listed in README, background tool, undo/redo | ✅ |
 | Pin screenshots | ✅ |
-| MP4/GIF recording, mic, webcam, clicks, keystrokes | ✅ (ffmpeg) |
 | Hide desktop icons | ✅ macOS/Windows, GNOME only on Linux |
 | History, settings, rebindable shortcuts, autostart, URL scheme | ✅ |
 
 ## Out of scope / later
 - Cloud upload / share links (removed by decision: NeatShotX stays fully local)
-- Automatic scrolling (synthetic scroll events), video trimmer/editor, pause/resume recording
+- Screen/video recording, GIF, webcam, keystroke overlay (removed by decision: ffmpeg dependency, per-OS capture backends, camera/mic/accessibility permissions)
+- All-In-One mode (dropped)
 - Computer-audio capture on macOS/Windows (needs ScreenCaptureKit / WASAPI loopback)
 - Editable project file (`.cleanshot` equivalent), resize handles on shapes, snapping guides
 - OCR / Capture Text (removed by decision)
-- Wayland capture/recording (xcap supports partial; ffmpeg x11grab does not)
+- Wayland capture (xcap supports it partially)
 
 ## Success metrics
 - Capture-to-clipboard ≤ 300 ms after mouse-up on a 5K display
 - Zero-crash rate for capture flows across the 3 OS targets in CI smoke tests
-- Installer size < 20 MB (excluding ffmpeg)
+- Installer size < 20 MB

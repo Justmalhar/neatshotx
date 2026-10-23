@@ -7,6 +7,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, fileName, param } from "../lib/api";
 import { materialize, spring } from "../lib/motion";
+import { DEFAULT_CURVE } from "../components/editor/arrows";
 import ShapeNode from "../components/editor/ShapeNode";
 import BackgroundPanel from "../components/editor/BackgroundPanel";
 import { Backdrop, groupClip } from "../components/editor/background/Backdrop";
@@ -44,7 +45,7 @@ export default function Editor() {
   const [past, setPast] = useState<Doc[]>([]);
   const [future, setFuture] = useState<Doc[]>([]);
   const [tool, setTool] = useState<Tool>("arrow");
-  const [style, setStyle] = useState<StyleValues>({ color: "#ff3b30", size: 4, emoji: "👍", textBg: "none", counterStart: 1 });
+  const [style, setStyle] = useState<StyleValues>({ color: "#ff3b30", size: 4, emoji: "👍", textBg: "none", counterStart: 1, arrowStyle: "tapered", arrowInverse: false });
   const [draft, setDraft] = useState<Shape | null>(null);
   const [live, setLive] = useState<Shape | null>(null); // endpoint-handle drag preview
   const [moving, setMoving] = useState(false);
@@ -122,13 +123,19 @@ export default function Editor() {
       setEditText("");
       return setEditing(s.id);
     }
+    if (tool === "arrow") Object.assign(s, { arrowStyle: style.arrowStyle, arrowInverse: style.arrowInverse, curve: DEFAULT_CURVE });
     if (tool === "pen" || tool === "highlighter") s.points = [0, 0];
     setDraft(s);
   };
 
-  const onMove = () => {
+  const onMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!down.current) return;
     const p = pointer();
+    if (draft && e.evt.shiftKey && (draft.kind === "arrow" || draft.kind === "line")) {
+      // Shift: snap angle to 15° steps
+      const dx = p.x - draft.x, dy = p.y - draft.y, L = Math.hypot(dx, dy), a = Math.round(Math.atan2(dy, dx) / (Math.PI / 12)) * (Math.PI / 12);
+      return setDraft({ ...draft, w: Math.cos(a) * L, h: Math.sin(a) * L });
+    }
     if (crop && tool === "crop") return setCrop({ ...crop, w: p.x - crop.x, h: p.y - crop.y });
     if (!draft) return;
     if (draft.points) setDraft({ ...draft, points: [...draft.points, p.x - draft.x, p.y - draft.y] });
@@ -241,7 +248,8 @@ export default function Editor() {
 
   // Style bar edits the selected object when there is one, and always updates the defaults for new objects.
   const shown: StyleValues = sel
-    ? { ...style, color: sel.color, size: sel.size, textBg: sel.bg ?? "none" }
+    ? { ...style, color: sel.color, size: sel.size, textBg: sel.bg ?? "none",
+        ...(sel.kind === "arrow" ? { arrowStyle: sel.arrowStyle ?? "standard", arrowInverse: !!sel.arrowInverse } : {}) }
     : style;
   const onStyle = (p: StylePatch) => {
     setStyle((s) => ({ ...s, ...p }));
@@ -250,6 +258,10 @@ export default function Editor() {
     if (p.color) patch.color = p.color;
     if (p.size) { patch.size = p.size; patch.fontSize = undefined; }
     if (p.textBg) patch.bg = p.textBg;
+    if (sel.kind === "arrow") {
+      if (p.arrowStyle) patch.arrowStyle = p.arrowStyle;
+      if (p.arrowInverse !== undefined) patch.arrowInverse = p.arrowInverse;
+    }
     if (Object.keys(patch).length)
       commitCoalesced(`style:${selected}:${Object.keys(patch).join()}`, { ...doc, shapes: doc.shapes.map((s) => (s.id === selected ? { ...s, ...patch } : s)) });
   };
@@ -346,7 +358,7 @@ export default function Editor() {
                     <Group x={ox} y={oy}>
                       {sel && linear && !moving && !editing && (
                         <LineHandles s={sel} scale={scale} onChange={setLive}
-                          onEnd={(n) => { setLive(null); patchShape(n.id, { x: n.x, y: n.y, w: n.w, h: n.h }); }} />
+                          onEnd={(n) => { setLive(null); patchShape(n.id, { x: n.x, y: n.y, w: n.w, h: n.h, curve: n.curve }); }} />
                       )}
                     </Group>
                   </Layer>

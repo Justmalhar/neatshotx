@@ -2,8 +2,8 @@ import { useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Pencil, Pin, Play, Trash2, X } from "lucide-react";
-import { api, fileName, fileSrc, isGif, isVideo } from "../../lib/api";
+import { Check, Pencil, Pin, Trash2, X } from "lucide-react";
+import { api, fileName, fileSrc } from "../../lib/api";
 import { spring, materialize } from "../../lib/motion";
 import { useAutoClose } from "./useAutoClose";
 import { useSwipeDismiss } from "./useSwipeDismiss";
@@ -21,15 +21,12 @@ type Props = {
   /** Cursor is over this card per the Rust pointer poll (CSS :hover can't fire in an inactive app). */
   pointerOver: boolean;
   onClose: () => void;
-  onReplace: (p: string) => void;
 };
 
-export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, autoSaved, pointerOver, onClose, onReplace }: Props) {
+export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, autoSaved, pointerOver, onClose }: Props) {
   const [toast, setToast] = useState<{ text: string; err?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [hover, setHover] = useState(false);
-  const video = isVideo(path);
-  const image = !video && !isGif(path);
 
   const flash = (text: string, err = false) => { setToast({ text, err }); setTimeout(() => setToast(null), err ? 2400 : 1300); };
   const run = async (f: () => Promise<unknown>, msg: string, after?: () => void) => {
@@ -40,7 +37,7 @@ export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, a
   const shown = hover || pointerOver;
   const progress = useAutoClose(autoCloseSecs, shown || busy, onClose);
   const { x, bind } = useSwipeDismiss(side, onClose, () => {
-    startDrag({ item: [path], icon: image ? path : "" }).then(() => closeAfterDrag && onClose()).catch(() => {});
+    startDrag({ item: [path], icon: path }).then(() => closeAfterDrag && onClose()).catch(() => {});
   });
 
   const saveAs = async () => {
@@ -57,17 +54,8 @@ export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, a
       onHoverEnd={() => setHover(false)}
       className="group relative shrink-0 select-none overflow-hidden rounded-[12px] bg-black/20 shadow-[0_8px_24px_rgba(0,0,0,0.3),0_0_0_0.5px_rgba(255,255,255,0.18)]"
     >
-      {video ? (
-        <video src={fileSrc(path)} className="pointer-events-none h-full w-full object-cover" muted autoPlay loop />
-      ) : (
-        <img src={`${fileSrc(path)}?v=${rev}`} className="pointer-events-none h-full w-full object-cover" draggable={false} />
-      )}
+      <img src={`${fileSrc(path)}?v=${rev}`} className="pointer-events-none h-full w-full object-cover" draggable={false} />
       <div className="pointer-events-none absolute inset-0 rounded-[12px] ring-1 ring-inset ring-white/10" />
-      {video && (
-        <div className={`pointer-events-none absolute inset-0 grid place-items-center transition-opacity ${shown ? "opacity-0" : ""}`}>
-          <span className="mat-hud grid h-10 w-10 place-items-center rounded-full"><Play size={16} fill="currentColor" /></span>
-        </div>
-      )}
 
       {/* CleanShot layout: corner actions + centered Copy / Save-or-Delete capsules over a dark scrim. */}
       <div className={`absolute inset-0 bg-[rgba(18,18,20,0.55)] backdrop-blur-[2px] transition-opacity duration-150 ${shown ? "opacity-100" : "pointer-events-none opacity-0"}`}>
@@ -79,11 +67,10 @@ export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, a
           )}
           <X size={12} strokeWidth={2.8} />
         </IconBtn>
-        {image && <IconBtn title="Pin to the screen" className="right-1.5 top-1.5" onClick={() => api.openPin(path)}><Pin size={11} strokeWidth={2.4} fill="currentColor" /></IconBtn>}
-        {image && <IconBtn title="Annotate" className="bottom-1.5 left-1.5" onClick={() => { api.openEditor(path); onClose(); }}><Pencil size={11} strokeWidth={2.4} fill="currentColor" /></IconBtn>}
+        <IconBtn title="Pin to the screen" className="right-1.5 top-1.5" onClick={() => api.openPin(path)}><Pin size={11} strokeWidth={2.4} fill="currentColor" /></IconBtn>
+        <IconBtn title="Annotate" className="bottom-1.5 left-1.5" onClick={() => { api.openEditor(path); onClose(); }}><Pencil size={11} strokeWidth={2.4} fill="currentColor" /></IconBtn>
         <div className="absolute inset-0 m-auto flex h-fit w-fit flex-col items-center gap-1.5">
-          {image && <PillBtn onClick={() => run(() => api.copyImage(path), "Copied")}>Copy</PillBtn>}
-          {video && <PillBtn onClick={() => run(async () => onReplace(await api.convertToGif(path)), "GIF ready")}>GIF</PillBtn>}
+          <PillBtn onClick={() => run(() => api.copyImage(path), "Copied")}>Copy</PillBtn>
           {autoSaved
             ? <PillBtn title="Delete" onClick={() => run(() => api.deleteCapture(path), "Deleted", onClose)}><Trash2 size={13} strokeWidth={2.3} /></PillBtn>
             : <PillBtn onClick={saveAs}>Save</PillBtn>}
