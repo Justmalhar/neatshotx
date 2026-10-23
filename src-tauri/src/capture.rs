@@ -241,7 +241,7 @@ pub fn capture_live(xcap_index: usize, r: Region) -> Result<RgbaImage, String> {
     Ok(imageops::crop_imm(&img, r.x, r.y, r.w, r.h).to_image())
 }
 
-fn countdown(app: &AppHandle, secs: u64) {
+pub fn countdown(app: &AppHandle, secs: u64) {
     if secs == 0 {
         return;
     }
@@ -377,4 +377,31 @@ pub async fn copy_png(app: AppHandle, data_b64: String) -> Result<(), String> {
     app.clipboard()
         .write_image(&tauri::image::Image::new(img.as_raw(), img.width(), img.height()))
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn clear_history(app: AppHandle) -> Result<(), String> {
+    let dir = history_dir(&app);
+    std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())
+}
+
+/// Drops history older than `history_keep_days` (0 = keep forever). Runs at startup.
+pub fn prune_history(app: &AppHandle) {
+    let days = settings::get(app).history_keep_days;
+    if days == 0 {
+        return;
+    }
+    let cutoff = std::time::SystemTime::now() - Duration::from_secs(days as u64 * 86_400);
+    for e in std::fs::read_dir(history_dir(app)).into_iter().flatten().flatten() {
+        if e.metadata().and_then(|m| m.modified()).map(|t| t < cutoff).unwrap_or(false) {
+            let _ = std::fs::remove_file(e.path());
+        }
+    }
+}
+
+/// Last confirmed selection for the selector's "Remember last selection".
+#[tauri::command]
+pub fn last_region(app: AppHandle) -> Option<Region> {
+    *state(&app).last_region.lock().unwrap()
 }

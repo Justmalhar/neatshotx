@@ -17,6 +17,16 @@ export type Settings = {
   record_show_clicks: boolean;
   record_show_keys: boolean;
   record_webcam: boolean;
+  record_countdown: boolean;
+  keystrokes_only_modifiers: boolean;
+  qa_position: "left" | "right";
+  qa_auto_close_secs: number;
+  qa_close_after_drag: boolean;
+  qa_close_after_upload: boolean;
+  selector_remember_last: boolean;
+  selector_show_magnifier: boolean;
+  play_sounds: boolean;
+  history_keep_days: number;
   upload_url: string;
   upload_field: string;
   upload_headers: Record<string, string>;
@@ -44,6 +54,8 @@ export const api = {
   openPin: (path: string) => invoke("open_pin", { path }),
   action: (name: string) => invoke("action", { name }),
   platform: () => invoke<string>("platform"),
+  clearHistory: () => invoke("clear_history"),
+  lastRegion: () => invoke<Region | null>("last_region"),
   getSettings: () => invoke<Settings>("get_settings"),
   setSettings: (settings: Settings) => invoke("set_settings", { settings }),
   /** Same-origin Blob URL so canvases stay exportable. */

@@ -139,7 +139,8 @@ fn qa_resize(app: AppHandle, height: f64) -> Result<(), String> {
     let (ax, ay, ah) = (area.position.x as f64 / s, area.position.y as f64 / s, area.size.height as f64 / s);
     let h = height.min(ah - 32.0);
     w.set_size(LogicalSize::new(280.0, h)).map_err(|e| e.to_string())?;
-    w.set_position(LogicalPosition::new(ax + 16.0, ay + ah - h - 16.0))
+    let x = if settings::get(&app).qa_position == "right" { ax + area.size.width as f64 / s - 280.0 - 16.0 } else { ax + 16.0 };
+    w.set_position(LogicalPosition::new(x, ay + ah - h - 16.0))
         .map_err(|e| e.to_string())
 }
 
@@ -195,6 +196,7 @@ pub fn run() {
             app.manage(settings::SettingsState(Mutex::new(settings::load(&handle))));
             tray::build(&handle)?;
             shortcuts::register(&handle);
+            capture::prune_history(&handle);
 
             #[cfg(any(windows, target_os = "linux"))]
             let _ = app.deep_link().register_all();
@@ -222,6 +224,8 @@ pub fn run() {
             capture::copy_file,
             capture::read_file,
             capture::copy_png,
+            capture::clear_history,
+            capture::last_region,
             record::stop_recording,
             record::cancel_recording,
             record::convert_to_gif,

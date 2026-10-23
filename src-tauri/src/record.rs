@@ -87,6 +87,9 @@ pub fn start(app: &AppHandle, r: Region, phys: (i32, i32), screen: usize) -> Res
         return Err("Already recording".into());
     }
     let s = settings::get(app);
+    if s.record_countdown {
+        crate::capture::countdown(app, 3);
+    }
     let out = crate::capture::new_capture_path(app, "mp4");
     let args = build_args(&s, r, phys, screen, &out.to_string_lossy());
     let child = Command::new(ffmpeg())
@@ -116,7 +119,10 @@ pub fn start(app: &AppHandle, r: Region, phys: (i32, i32), screen: usize) -> Res
 fn start_input_overlay(app: &AppHandle, s: &settings::Settings, screen: usize) {
     let monitors = app.available_monitors().unwrap_or_default();
     let Some(m) = monitors.get(screen).or(monitors.first()) else { return };
-    let route = format!("/input-overlay?clicks={}&keys={}", s.record_show_clicks, s.record_show_keys);
+    let route = format!(
+        "/input-overlay?clicks={}&keys={}&mods={}",
+        s.record_show_clicks, s.record_show_keys, s.keystrokes_only_modifiers
+    );
     if let Ok(w) = windows::cover_monitor(app, "input-overlay", &route, *m.position(), *m.size(), true) {
         let _ = w.set_ignore_cursor_events(true);
     }
@@ -135,7 +141,8 @@ fn start_input_overlay(app: &AppHandle, s: &settings::Settings, screen: usize) {
                 let _ = app.emit_to("input-overlay", "input-click", mouse.coords);
             }
             prev_down = down;
-            let keys: Vec<String> = dev.get_keys().iter().map(|k| format!("{k:?}")).collect();
+            // Never broadcast keys typed into password fields.
+            let keys: Vec<String> = if secure_input() { vec![] } else { dev.get_keys().iter().map(|k| format!("{k:?}")).collect() };
             if keys != prev_keys && !keys.is_empty() {
                 let _ = app.emit_to("input-overlay", "input-keys", &keys);
             }
@@ -143,6 +150,22 @@ fn start_input_overlay(app: &AppHandle, s: &settings::Settings, screen: usize) {
             thread::sleep(Duration::from_millis(16));
         }
     });
+}
+
+/// macOS sets Secure Event Input while a password field has focus.
+#[cfg(target_os = "macos")]
+fn secure_input() -> bool {
+    #[link(name = "Carbon", kind = "framework")]
+    extern "C" {
+        fn IsSecureEventInputEnabled() -> u8;
+    }
+    unsafe { IsSecureEventInputEnabled() != 0 }
+}
+
+// ponytail: no portable password-field signal on Windows/Linux; users can disable keystrokes.
+#[cfg(not(target_os = "macos"))]
+fn secure_input() -> bool {
+    false
 }
 
 fn teardown(app: &AppHandle) -> Option<(Child, PathBuf)> {
