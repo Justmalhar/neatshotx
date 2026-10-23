@@ -86,7 +86,7 @@ impl Default for Settings {
             qa_close_after_drag: true,
             qa_close_after_upload: false,
             selector_remember_last: false,
-            selector_show_magnifier: true,
+            selector_show_magnifier: false,
             play_sounds: true,
             history_keep_days: 0,
             upload_url: String::new(),

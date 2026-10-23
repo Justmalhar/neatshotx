@@ -212,13 +212,6 @@ export default function Selector() {
           )}
         </AnimatePresence>
 
-        {cursor && !sel && (
-          <>
-            <div className="pointer-events-none absolute left-0 top-0 h-full w-px bg-white mix-blend-difference" style={{ transform: `translate3d(${snap(cursor.x)}px,0,0)` }} />
-            <div className="pointer-events-none absolute left-0 top-0 h-px w-full bg-white mix-blend-difference" style={{ transform: `translate3d(0,${snap(cursor.y)}px,0)` }} />
-          </>
-        )}
-
         {sel && !drawing && !closing && (
           <SelectionHud
             rect={sel}
