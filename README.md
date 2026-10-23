@@ -59,3 +59,13 @@ Parameters (CleanShot API style; coordinates are in display points on macOS / pi
 | `neatshotx://pin?filepath=/abs/path.png` | Pin a file to the screen |
 
 Launching NeatShotX again with no arguments opens Preferences (useful when the menu bar icon is hidden).
+
+## Releasing
+
+```bash
+# bump "version" in src-tauri/tauri.conf.json (and package.json), commit, then:
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+The Release workflow builds macOS (universal), Windows and Linux installers and attaches them to a
+**draft** GitHub release. Review it under Releases and click *Publish release*. Builds are unsigned.

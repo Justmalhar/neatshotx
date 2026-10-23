@@ -61,7 +61,7 @@ jobs:
         with:
           tauriScript: bunx tauri
           args: ${{ matrix.args }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: neatshotx-${{ matrix.os }}
           path: src-tauri/target/**/release/bundle/**

@@ -1,0 +1,56 @@
+name: Release
+
+# Push a tag like v0.1.0 to build all platforms and attach installers to a DRAFT GitHub release.
+# Review the draft on GitHub, then click "Publish release".
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  LINUX_DEPS: >-
+    libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+    libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev
+    libegl1-mesa-dev libgbm-dev clang
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: --target universal-apple-darwin
+          - os: windows-latest
+            args: ""
+          - os: ubuntu-24.04
+            args: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: src-tauri }
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y $LINUX_DEPS
+      - run: bun install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: bunx tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: NeatShotX ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseBody: |
+            Unsigned builds: macOS will ask you to allow the app in System Settings → Privacy & Security,
+            and Windows SmartScreen may warn on first launch.
+            Linux needs PipeWire 1.0+ (Ubuntu 24.04+, Fedora 39+).
+          releaseDraft: true
+          prerelease: false
