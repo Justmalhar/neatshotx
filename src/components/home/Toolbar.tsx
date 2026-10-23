@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Camera, Cloud, Command, History, Info, MousePointerSquareDashed, Settings, Video, type LucideIcon } from "lucide-react";
+import { Camera, Command, History, Info, MousePointerSquareDashed, Settings, Video, type LucideIcon } from "lucide-react";
 import { spring } from "../../lib/motion";
 
 export const TABS = [
@@ -9,7 +9,6 @@ export const TABS = [
   { id: "quick-access", label: "Quick Access", Icon: MousePointerSquareDashed },
   { id: "recording", label: "Recording", Icon: Video },
   { id: "screenshots", label: "Screenshots", Icon: Camera },
-  { id: "cloud", label: "Cloud", Icon: Cloud },
   { id: "history", label: "History", Icon: History },
   { id: "about", label: "About", Icon: Info },
 ] as const satisfies readonly { id: string; label: string; Icon: LucideIcon }[];

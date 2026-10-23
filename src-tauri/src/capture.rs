@@ -310,11 +310,11 @@ pub fn announce(app: &AppHandle, path: &std::path::Path) {
     let s = settings::get(app);
     let p = path.to_string_lossy().to_string();
     let is_video = matches!(path.extension().and_then(|e| e.to_str()), Some("mp4" | "gif" | "mov"));
-    let (quick_access, upload) = if is_video {
+    let quick_access = if is_video {
         if s.recording_save && !s.save_dir.is_empty() {
             let _ = std::fs::copy(path, PathBuf::from(&s.save_dir).join(path.file_name().unwrap()));
         }
-        (s.recording_quick_access, s.recording_upload)
+        s.recording_quick_access
     } else {
         if s.screenshot_annotate {
             crate::open_editor_window(app, &p);
@@ -322,18 +322,11 @@ pub fn announce(app: &AppHandle, path: &std::path::Path) {
         if s.screenshot_pin {
             crate::open_pin_window(app, &p);
         }
-        (s.show_quick_access, s.screenshot_upload)
+        s.show_quick_access
     };
     let _ = app.emit("capture-added", &p);
     if quick_access {
         crate::open_quick_access(app, &p);
-    }
-    if upload {
-        let (app, p) = (app.clone(), p.clone());
-        tauri::async_runtime::spawn(async move {
-            let res = crate::upload::upload_file(&app, p.clone()).await;
-            let _ = app.emit("upload-finished", serde_json::json!({ "path": p, "result": res }));
-        });
     }
 }
 

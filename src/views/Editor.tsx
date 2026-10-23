@@ -210,7 +210,6 @@ export default function Editor() {
     if (dest) act(() => api.writePng(exportPng(), dest), "Saved");
   };
   const doPin = () => act(async () => api.openPin(await api.writePng(exportPng())), "Pinned");
-  const doUpload = () => act(async () => api.upload(await api.writePng(exportPng(), path)), "Link copied");
   const doReveal = () => act(async () => revealItemInDir(await api.writePng(exportPng(), path)), "Shown in Finder");
   const doDone = async () => {
     try { await api.writePng(exportPng(), path); await getCurrentWindow().close(); } catch (e) { flash(String(e)); }
@@ -382,7 +381,7 @@ export default function Editor() {
       </div>
 
       <BottomBar zoom={zoom} canRevert={doc.base !== original || doc.shapes.length > 0} revert={revert}
-        materialize={() => api.writePng(exportPng())} share={doReveal} pin={doPin} copy={doCopy} upload={doUpload} />
+        materialize={() => api.writePng(exportPng())} share={doReveal} pin={doPin} copy={doCopy} />
     </div>
     </MotionConfig>
   );

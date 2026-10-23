@@ -13,7 +13,6 @@ export default function QuickAccess({ s, set }: PaneProps) {
       </Section>
       <Section label="Dismissal:">
         <Checkbox checked={s.qa_close_after_drag} onChange={(v) => set("qa_close_after_drag", v)}>Close after dragging</Checkbox>
-        <Checkbox checked={s.qa_close_after_upload} onChange={(v) => set("qa_close_after_upload", v)}>Close after uploading</Checkbox>
       </Section>
     </>
   );

@@ -13,7 +13,6 @@ const AFTER: [string, keyof Settings, keyof Settings | null][] = [
   ["Show Quick Access Overlay", "show_quick_access", "recording_quick_access"],
   ["Copy file to clipboard", "copy_after_capture", null],
   ["Save", "save_after_capture", "recording_save"],
-  ["Upload to Cloud & copy link", "screenshot_upload", "recording_upload"],
   ["Open Annotate tool", "screenshot_annotate", null],
   ["Pin to the screen", "screenshot_pin", null],
 ];

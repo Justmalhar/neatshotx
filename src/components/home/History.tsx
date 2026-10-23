@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { motion } from "motion/react";
-import { Copy, FolderOpen, Image as ImageIcon, Pencil, Pin, Trash2, UploadCloud, Video } from "lucide-react";
+import { Copy, FolderOpen, Image as ImageIcon, Pencil, Pin, Trash2, Video } from "lucide-react";
 import { api, fileName, fileSrc, isGif, isVideo } from "../../lib/api";
 import { spring } from "../../lib/motion";
 import { Btn, PopUp } from "./form";
@@ -101,7 +101,6 @@ function Card({ p, rev, onDeleted }: { p: string; rev: number; onDeleted: () => 
           {image && <A t="Annotate" on={() => api.openEditor(p)}><Pencil size={14} /></A>}
           {image && <A t="Copy" on={() => api.copyImage(p)}><Copy size={14} /></A>}
           {image && <A t="Pin" on={() => api.openPin(p)}><Pin size={14} /></A>}
-          <A t="Upload" on={() => api.upload(p).then((u) => alert(`Link copied:\n${u}`)).catch((e) => alert(e))}><UploadCloud size={14} /></A>
           <A t="Show in folder" on={() => revealItemInDir(p)}><FolderOpen size={14} /></A>
           <A t="Delete" on={() => api.deleteCapture(p).then(onDeleted)}><Trash2 size={14} /></A>
         </div>

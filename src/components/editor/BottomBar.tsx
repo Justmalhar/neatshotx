@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GripHorizontal, Pin, Share, UploadCloud, Copy } from "lucide-react";
+import { GripHorizontal, Pin, Share, Copy } from "lucide-react";
 import ZoomMenu from "./ZoomMenu";
 import { CapButton, ICON, cap } from "./IconButton";
 import type { Zoom } from "./useZoom";
@@ -13,10 +13,9 @@ type Props = {
   share: () => void;
   pin: () => void;
   copy: () => void;
-  upload: () => void;
 };
 
-/** 52px bottom bar: zoom | "Drag Me" (drag the annotated image into other apps) | share, pin, copy, upload. */
+/** 52px bottom bar: zoom | "Drag Me" (drag the annotated image into other apps) | share, pin, copy. */
 export default function BottomBar(p: Props) {
   const [pressed, setPressed] = useState(false);
   const drag = async () => {
@@ -39,7 +38,6 @@ export default function BottomBar(p: Props) {
         <CapButton round side="top" icon={<Share {...ICON} size={16} />} label="Show in Finder" onClick={p.share} />
         <CapButton round side="top" icon={<Pin {...ICON} size={16} />} label="Pin to screen" onClick={p.pin} />
         <CapButton round side="top" icon={<Copy {...ICON} size={16} />} label="Copy" kbd="⌘C" onClick={p.copy} />
-        <CapButton round side="top" icon={<UploadCloud {...ICON} size={16} />} label="Upload" align="end" onClick={p.upload} />
       </div>
     </footer>
   );

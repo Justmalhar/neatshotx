@@ -16,7 +16,7 @@ const HEADER_H = 32;
 export default function QuickAccess() {
   const [items, setItems] = useState<string[]>([]);
   const [rev, setRev] = useState(0); // cache-bust thumbnails after a file is overwritten
-  const [cfg, setCfg] = useState<Pick<Settings, "qa_position" | "qa_auto_close_secs" | "qa_close_after_drag" | "qa_close_after_upload" | "play_sounds" | "save_after_capture" | "recording_save"> | null>(null);
+  const [cfg, setCfg] = useState<Pick<Settings, "qa_position" | "qa_auto_close_secs" | "qa_close_after_drag" | "play_sounds" | "save_after_capture" | "recording_save"> | null>(null);
   const seen = useRef(new Set<string>());
   const sounds = useRef(false);
 
@@ -98,7 +98,6 @@ export default function QuickAccess() {
                 side={cfg.qa_position}
                 autoCloseSecs={cfg.qa_auto_close_secs}
                 closeAfterDrag={cfg.qa_close_after_drag}
-                closeAfterUpload={cfg.qa_close_after_upload}
                 autoSaved={isVideo(p) ? cfg.recording_save : cfg.save_after_capture}
                 pointerOver={pointerPath === p}
                 onClose={() => remove(p)}

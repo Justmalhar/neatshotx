@@ -17,25 +17,19 @@ export type Settings = {
   record_show_clicks: boolean;
   record_show_keys: boolean;
   record_webcam: boolean;
-  screenshot_upload: boolean;
   screenshot_annotate: boolean;
   screenshot_pin: boolean;
   recording_quick_access: boolean;
   recording_save: boolean;
-  recording_upload: boolean;
   record_countdown: boolean;
   keystrokes_only_modifiers: boolean;
   qa_position: "left" | "right";
   qa_auto_close_secs: number;
   qa_close_after_drag: boolean;
-  qa_close_after_upload: boolean;
   selector_remember_last: boolean;
   selector_show_magnifier: boolean;
   play_sounds: boolean;
   history_keep_days: number;
-  upload_url: string;
-  upload_field: string;
-  upload_headers: Record<string, string>;
   shortcuts: Record<string, string>;
 };
 
@@ -53,7 +47,6 @@ export const api = {
   cancelRecording: () => invoke("cancel_recording"),
   convertToGif: (path: string) => invoke<string>("convert_to_gif", { path }),
   finishScroll: (keep: boolean) => invoke("finish_scroll", { keep }),
-  upload: (path: string) => invoke<string>("upload", { path }),
   takePending: () => invoke<string[]>("take_pending"),
   qaResize: (height: number) => invoke("qa_resize", { height }),
   openEditor: (path: string) => invoke("open_editor", { path }),

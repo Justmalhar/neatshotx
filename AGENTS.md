@@ -14,5 +14,5 @@
   pixels are read (editor, OCR). `convertFileSrc` is fine for display-only `<img>`/`<video>`.
 - `xcap` 0.9 getters return `Result` — always `unwrap_or` them.
 - Disk on the dev machine can be tight: dev profile has `debug = 0`. Don't re-enable without checking free space.
-- Tests: `cd src-tauri && cargo test --lib` (scroll stitcher, ffmpeg args, upload URL parsing). Frontend: `bunx tsc --noEmit`.
+- Tests: `cd src-tauri && cargo test --lib` (scroll stitcher, ffmpeg args). Frontend: `bunx tsc --noEmit`.
 - Recording depends on a system ffmpeg (`record::ffmpeg()` searches Homebrew paths then PATH). Bundling as a sidecar is a TODO.

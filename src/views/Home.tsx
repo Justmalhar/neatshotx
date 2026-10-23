@@ -13,7 +13,6 @@ import Shortcuts from "../components/home/panes/Shortcuts";
 import QuickAccess from "../components/home/panes/QuickAccess";
 import Recording from "../components/home/panes/Recording";
 import Screenshots from "../components/home/panes/Screenshots";
-import Cloud from "../components/home/panes/Cloud";
 import About from "../components/home/panes/About";
 
 const toTab = (t: string | null): Tab => (t === "settings" ? "general" : TABS.some((x) => x.id === t) ? (t as Tab) : "history");
@@ -45,8 +44,7 @@ export default function Home() {
     : tab === "shortcuts" ? <Shortcuts {...ctl} />
     : tab === "quick-access" ? <QuickAccess {...ctl} />
     : tab === "recording" ? <Recording {...ctl} />
-    : tab === "screenshots" ? <Screenshots {...ctl} />
-    : <Cloud {...ctl} />;
+    : <Screenshots {...ctl} />;
 
   return (
     <div className="flex h-full flex-col bg-[var(--bg-window)]">

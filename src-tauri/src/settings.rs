@@ -20,25 +20,19 @@ pub struct Settings {
     pub record_show_keys: bool,
     pub record_webcam: bool,
     // After-capture matrix (screenshot columns reuse the original three flags above).
-    pub screenshot_upload: bool,
     pub screenshot_annotate: bool,
     pub screenshot_pin: bool,
     pub recording_quick_access: bool,
     pub recording_save: bool,
-    pub recording_upload: bool,
     pub record_countdown: bool,
     pub keystrokes_only_modifiers: bool,
     pub qa_position: String, // "left" | "right"
     pub qa_auto_close_secs: u64, // 0 = never
     pub qa_close_after_drag: bool,
-    pub qa_close_after_upload: bool,
     pub selector_remember_last: bool,
     pub selector_show_magnifier: bool,
     pub play_sounds: bool,
     pub history_keep_days: u32, // 0 = forever
-    pub upload_url: String,
-    pub upload_field: String,
-    pub upload_headers: BTreeMap<String, String>,
     pub shortcuts: BTreeMap<String, String>, // action -> accelerator
 }
 
@@ -73,25 +67,19 @@ impl Default for Settings {
             record_show_clicks: true,
             record_show_keys: false,
             record_webcam: false,
-            screenshot_upload: false,
             screenshot_annotate: false,
             screenshot_pin: false,
             recording_quick_access: true,
             recording_save: true,
-            recording_upload: false,
             record_countdown: true,
             keystrokes_only_modifiers: false,
             qa_position: "left".into(),
             qa_auto_close_secs: 0,
             qa_close_after_drag: true,
-            qa_close_after_upload: false,
             selector_remember_last: false,
             selector_show_magnifier: false,
             play_sounds: true,
             history_keep_days: 0,
-            upload_url: String::new(),
-            upload_field: "file".into(),
-            upload_headers: BTreeMap::new(),
             shortcuts,
         }
     }

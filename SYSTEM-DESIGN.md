@@ -3,14 +3,14 @@
 ## 1. Requirements
 
 **Functional:** capture area/window/fullscreen/previous/self-timer/scrolling, OCR, MP4/GIF recording with mic, webcam,
-clicks and keystrokes, Quick Access Overlay, annotate, pin, history, upload, hide desktop icons, global shortcuts,
+clicks and keystrokes, Quick Access Overlay, annotate, pin, history, hide desktop icons, global shortcuts,
 URL scheme, launch at login. Full list in [PRD.md](PRD.md).
 
 **Non-functional**
 - Cross-platform: macOS 11+, Windows 10+, Linux (X11; Wayland partial).
 - Latency: overlay visible < 250 ms after the shortcut; clipboard < 300 ms after mouse-up.
 - Footprint: native webview (no Chromium bundle); idle RAM < 60 MB with no windows open.
-- Privacy: everything local. Network only for an upload you configure and the first-run OCR model download.
+- Privacy: everything local. The only network access is the first-run OCR model download.
 - Cost: free, no backend.
 
 ## 2. High-level design
@@ -22,7 +22,7 @@ URL scheme, launch at login. Full list in [PRD.md](PRD.md).
  │ Deep link ─┤          │             record.rs    │◄invoke─│ #/editor      Konva annotate         │
  │ CLI args  ─┘          │             scroll.rs    │        │ #/pin #/ocr #/countdown              │
  │                       ▼             desktop.rs   │        │ #/record-bar #/scroll-bar #/webcam   │
- │                 windows.rs (builders) upload.rs  │        │ #/input-overlay  #/home (history/    │
+ │                 windows.rs (builders) tray.rs    │        │ #/input-overlay  #/home (history/    │
  │ settings.rs (JSON in app config dir)             │        │                         settings)    │
  └──────────┬──────────────┬──────────────┬─────────┘        └──────────────────────────────────────┘
             │ xcap         │ ffmpeg child │ device_query
@@ -82,7 +82,6 @@ Overlays: `#/record-bar` (timer, MP4/GIF/discard), `#/webcam` (getUserMedia bubb
 | `list_history`, `delete_capture(path)`, `copy_file(src,dest)` | History |
 | `stop_recording(asGif)`, `cancel_recording`, `convert_to_gif(path)` | Recording |
 | `finish_scroll(keep)` | Scrolling capture |
-| `upload(path)` | Multipart POST, returns and copies the URL |
 | `take_pending`, `qa_resize(height)` | Quick Access queue / layout |
 | `open_editor`, `open_pin`, `action(name)` | Window/action triggers |
 | `get_settings`, `set_settings` | Persisted JSON, re-registers shortcuts |
@@ -96,7 +95,7 @@ No database. Everything is on the filesystem:
 
 ### Dependencies
 Rust: `tauri 2` (tray, asset protocol, macOS private API), `xcap` (capture), `image`, `device_query` (input overlay),
-`reqwest` (upload), `chrono`, `base64`, `objc2` (macOS window level), plus the `global-shortcut`, `clipboard-manager`,
+`chrono`, `base64`, `objc2` (macOS window level), plus the `global-shortcut`, `clipboard-manager`,
 `dialog`, `opener`, `autostart`, `deep-link`, `single-instance` and `drag` plugins.
 JS: React 19, Vite, Tailwind v4, `konva`/`react-konva`, `tesseract.js`, `motion`, `lucide-react`, `@crabnebula/tauri-plugin-drag`.
 External: `ffmpeg` binary.

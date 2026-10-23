@@ -5,7 +5,6 @@ mod scroll;
 mod settings;
 mod shortcuts;
 mod tray;
-mod upload;
 mod windows;
 
 use std::sync::Mutex;
@@ -257,7 +256,6 @@ pub fn run() {
             record::cancel_recording,
             record::convert_to_gif,
             scroll::finish_scroll,
-            upload::upload,
             take_pending,
             qa_resize,
             open_editor,

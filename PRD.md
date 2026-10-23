@@ -35,11 +35,10 @@ Derived from `Info.plist`, Mach-O strings and bundled resources of `/Application
 | Pin screenshots | ✅ |
 | MP4/GIF recording, mic, webcam, clicks, keystrokes | ✅ (ffmpeg) |
 | Hide desktop icons | ✅ macOS/Windows, GNOME only on Linux |
-| Upload + copy link | ✅ generic endpoint (no hosted cloud) |
 | History, settings, rebindable shortcuts, autostart, URL scheme | ✅ |
 
 ## Out of scope / later
-- Hosted cloud service, team accounts, share pages
+- Cloud upload / share links (removed by decision: NeatShotX stays fully local)
 - Automatic scrolling (synthetic scroll events), video trimmer/editor, pause/resume recording
 - Computer-audio capture on macOS/Windows (needs ScreenCaptureKit / WASAPI loopback)
 - Editable project file (`.cleanshot` equivalent), resize handles on shapes, snapping guides

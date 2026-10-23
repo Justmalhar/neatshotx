@@ -2,7 +2,7 @@ import { useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, CloudUpload, Pencil, Pin, Play, Trash2, X } from "lucide-react";
+import { Check, Pencil, Pin, Play, Trash2, X } from "lucide-react";
 import { api, fileName, fileSrc, isGif, isVideo } from "../../lib/api";
 import { spring, materialize } from "../../lib/motion";
 import { useAutoClose } from "./useAutoClose";
@@ -16,7 +16,6 @@ type Props = {
   side: "left" | "right";
   autoCloseSecs: number;
   closeAfterDrag: boolean;
-  closeAfterUpload: boolean;
   /** Saved automatically after capture → offer Delete instead of Save (CleanShot behavior). */
   autoSaved: boolean;
   /** Cursor is over this card per the Rust pointer poll (CSS :hover can't fire in an inactive app). */
@@ -25,7 +24,7 @@ type Props = {
   onReplace: (p: string) => void;
 };
 
-export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, closeAfterUpload, autoSaved, pointerOver, onClose, onReplace }: Props) {
+export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, autoSaved, pointerOver, onClose, onReplace }: Props) {
   const [toast, setToast] = useState<{ text: string; err?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [hover, setHover] = useState(false);
@@ -82,10 +81,6 @@ export default function Card({ path, rev, side, autoCloseSecs, closeAfterDrag, c
         </IconBtn>
         {image && <IconBtn title="Pin to the screen" className="right-1.5 top-1.5" onClick={() => api.openPin(path)}><Pin size={11} strokeWidth={2.4} fill="currentColor" /></IconBtn>}
         {image && <IconBtn title="Annotate" className="bottom-1.5 left-1.5" onClick={() => { api.openEditor(path); onClose(); }}><Pencil size={11} strokeWidth={2.4} fill="currentColor" /></IconBtn>}
-        <IconBtn title="Upload & copy link" className="bottom-1.5 right-1.5"
-          onClick={() => run(() => api.upload(path), "Link copied", closeAfterUpload ? () => setTimeout(onClose, 900) : undefined)}>
-          <CloudUpload size={12} strokeWidth={2.5} />
-        </IconBtn>
         <div className="absolute inset-0 m-auto flex h-fit w-fit flex-col items-center gap-1.5">
           {image && <PillBtn onClick={() => run(() => api.copyImage(path), "Copied")}>Copy</PillBtn>}
           {video && <PillBtn onClick={() => run(async () => onReplace(await api.convertToGif(path)), "GIF ready")}>GIF</PillBtn>}

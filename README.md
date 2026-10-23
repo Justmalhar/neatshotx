@@ -10,10 +10,10 @@ Built with **Tauri 2 (Rust)** + **React/TypeScript**. Lives in the menu bar / sy
 | Capture | Area (frozen screen, crosshair + magnifier), Window (hover detect), Fullscreen (all monitors), Previous Area, Self-Timer, Scrolling Capture |
 | Text | Capture Text (OCR via Tesseract WASM) → clipboard, with/without line breaks |
 | Record | MP4 or GIF of any area, microphone, webcam bubble, click highlights, keystroke HUD |
-| After capture | Quick Access Overlay (copy, save, drag-out, annotate, pin, upload, convert to GIF), auto copy/save |
+| After capture | Quick Access Overlay (copy, save/delete, drag-out, annotate, pin, convert to GIF), auto copy/save |
 | Annotate | Arrow, rectangle, filled rectangle, ellipse, line, pen, highlighter, text, counter, pixelate, blur, spotlight, emoji, crop, background (gradient/padding/radius/shadow), undo/redo |
 | Pin | Floating always-on-top screenshots (wheel = opacity, double-click = close) |
-| Other | History, Hide desktop icons, upload to your own endpoint, rebindable global shortcuts, launch at login, `neatshotx://` URL scheme |
+| Other | History, Hide desktop icons, rebindable global shortcuts, launch at login, `neatshotx://` URL scheme |
 
 ## Requirements
 
