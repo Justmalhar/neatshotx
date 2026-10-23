@@ -275,7 +275,7 @@ export default function Editor() {
 
   return (
     <div className="flex h-full flex-col">
-      <TopBar
+      <TopBar name={fileName(path)} dims={`${Math.round(W)} × ${Math.round(H)}`}
         tool={tool} setTool={setTool} styleKind={sel ? sel.kind : tool} style={shown} onStyle={onStyle} zoom={zoom}
         canUndo={past.length > 0} canRedo={future.length > 0} canRevert={doc.base !== original || doc.shapes.length > 0}
         bgOn={bg.enabled} undo={undo} redo={redo} revert={revert} toggleBg={() => setBg({ ...bg, enabled: !bg.enabled })}

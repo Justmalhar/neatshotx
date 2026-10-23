@@ -6,6 +6,7 @@ import { EMOJIS, SIZES, type Tool } from "./types";
 import ColorWell from "./ColorWell";
 import Popover from "./Popover";
 import Tip from "./Tip";
+import { Sep, iconBtn } from "./IconButton";
 
 export type StyleValues = { color: string; size: number; emoji: string; textBg: "none" | "solid"; counterStart: number };
 export type StylePatch = Partial<StyleValues>;
@@ -19,7 +20,6 @@ const HINT: Partial<Record<Tool, string>> = {
   spotlight: "Drag to spotlight an area",
   crop: "Drag to crop, then press Return",
 };
-const Sep = () => <span className="mx-1 h-4 w-px bg-[var(--separator)]" />;
 const Label = ({ children }: { children: ReactNode }) => <span className="t-caption mr-1">{children}</span>;
 
 function SizeButton({ kind, size, onChange }: { kind: Tool; size: number; onChange: (n: number) => void }) {
@@ -27,12 +27,12 @@ function SizeButton({ kind, size, onChange }: { kind: Tool; size: number; onChan
   const names = ["Small", "Medium", "Large"];
   const mark = (n: number, i: number) => glyph
     ? <span className="font-semibold leading-none" style={{ fontSize: 10 + i * 3 }}>{kind === "counter" ? "1" : kind === "emoji" ? "☺" : "Aa"}</span>
-    : <span className="w-8 rounded-full bg-current" style={{ height: n }} />;
+    : <span className="w-4 rounded-full bg-current" style={{ height: n }} />;
   return (
     <Popover trigger={({ open, toggle }) => (
       <Tip label={glyph ? "Size" : "Stroke size"}>
-        <button className="btn !px-2" style={open ? { background: "var(--fill)" } : undefined} onClick={toggle} aria-label="Size">
-          <span className="grid h-4 w-7 place-items-center">{mark(size, SIZES.indexOf(size))}</span>
+        <button className={iconBtn} aria-pressed={open} onClick={toggle} aria-label="Size">
+          <span className="grid h-4 w-5 place-items-center">{mark(size, SIZES.indexOf(size))}</span>
         </button>
       </Tip>
     )}>
@@ -79,7 +79,7 @@ export default function StyleBar({ kind, v, onChange }: { kind: Tool; v: StyleVa
   );
   if (kind === "emoji") items.push(
     <Popover trigger={({ toggle }) => (
-      <button className="btn !px-2" onClick={toggle}><span className="text-base leading-none">{v.emoji}</span><Label>Change</Label></button>
+      <Tip label="Change emoji"><button className={iconBtn} aria-label="Change emoji" onClick={toggle}><span className="text-base leading-none">{v.emoji}</span></button></Tip>
     )}>
       {(close) => (
         <div className="grid grid-cols-8 gap-0.5">
@@ -92,10 +92,10 @@ export default function StyleBar({ kind, v, onChange }: { kind: Tool; v: StyleVa
   );
   return (
     <motion.div key={kind} initial={{ y: -3 }} animate={{ y: 0 }} transition={spring.ui}
-      className="flex min-h-7 items-center gap-0.5">
+      data-tauri-drag-region className="flex min-h-7 min-w-0 items-center gap-1">
       {items.length
         ? items.map((n, i) => <Fragment key={i}>{i > 0 && <Sep />}{n}</Fragment>)
-        : <span className="t-caption px-2">{hint}</span>}
+        : <span className="t-caption truncate px-2">{hint}</span>}
     </motion.div>
   );
 }

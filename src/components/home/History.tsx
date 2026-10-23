@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 import { Copy, FolderOpen, Image as ImageIcon, Pencil, Pin, Trash2, UploadCloud, Video } from "lucide-react";
 import { api, fileName, fileSrc, isGif, isVideo } from "../../lib/api";
 import { spring } from "../../lib/motion";
-import Segmented from "./ui/Segmented";
+import { Btn, PopUp } from "./form";
 import type { PaneProps } from "./panes/types";
 
 type Filter = "all" | "images" | "videos";
@@ -56,25 +56,20 @@ export default function History({ s, set }: PaneProps) {
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="t-large">History</h1>
-          <p className="t-callout mt-1">{items.length === 1 ? "1 capture" : `${items.length} captures`}</p>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--separator)] pb-4">
+        <div className="flex items-center gap-2">
+          <PopUp label="Filter" className="w-28" value={filter} onChange={setFilter} options={[["all", "All"], ["images", "Images"], ["videos", "Videos"]]} />
+          <span className="t-caption">{items.length === 1 ? "1 capture" : `${items.length} captures`}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Segmented label="Filter" value={filter} onChange={setFilter} options={[["all", "All"], ["images", "Images"], ["videos", "Videos"]]} />
-          <label className="flex items-center gap-1.5">
-            <span className="t-caption">Keep</span>
-            <select className="input" value={s.history_keep_days} onChange={(e) => set("history_keep_days", +e.target.value)}>
-              {KEEP.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </label>
-          <button className="btn btn-secondary !text-[var(--danger)]" disabled={!items.length} onClick={clear}>Clear History…</button>
+        <div className="flex items-center gap-2">
+          <span className="font-medium">Keep history:</span>
+          <PopUp label="Keep history" className="w-28" value={s.history_keep_days} onChange={(v) => set("history_keep_days", v)} options={KEEP} />
+          <Btn className="!text-[var(--danger)]" disabled={!items.length} onClick={clear}>Clear History…</Btn>
         </div>
       </div>
 
       {!shown.length ? (
-        <div className="grid place-items-center gap-2 py-24 text-center">
+        <div className="grid place-items-center gap-2 py-20 text-center">
           <ImageIcon size={56} strokeWidth={1.25} className="text-[var(--label-3)]" />
           <h2 className="t-title mt-2">{items.length ? "Nothing here" : "No captures yet"}</h2>
           <p className="t-callout max-w-xs">{items.length ? "No captures match this filter." : "Press ⌥⇧2 to capture an area, or use the menu bar icon."}</p>

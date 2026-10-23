@@ -1,17 +1,16 @@
-import { ChevronDown } from "lucide-react";
 import { motion } from "motion/react";
 import { spring } from "../../lib/motion";
 import { COLORS } from "./types";
 import Popover from "./Popover";
 import Tip from "./Tip";
+import { iconBtn } from "./IconButton";
 
 export default function ColorWell({ color, onChange }: { color: string; onChange: (c: string) => void }) {
   return (
     <Popover trigger={({ open, toggle }) => (
       <Tip label="Color">
-        <button className="btn !gap-1 !px-1.5" style={open ? { background: "var(--fill)" } : undefined} onClick={toggle} aria-label="Color">
+        <button className={iconBtn} aria-pressed={open} onClick={toggle} aria-label="Color">
           <span className="h-[18px] w-[18px] rounded-full" style={{ background: color, boxShadow: "inset 0 0 0 1px rgba(0,0,0,.22), 0 0 0 1.5px var(--bg-content)" }} />
-          <ChevronDown size={11} className="opacity-50" />
         </button>
       </Tip>
     )}>

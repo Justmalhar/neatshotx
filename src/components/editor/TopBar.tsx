@@ -1,12 +1,16 @@
-import { Copy, Download, ImagePlus, Pin, Redo2, RotateCcw, Save, Undo2, UploadCloud, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Copy, Download, ImagePlus, Pin, Redo2, RotateCcw, Save, Undo2, UploadCloud } from "lucide-react";
 import type { Tool } from "./types";
 import StyleBar, { type StylePatch, type StyleValues } from "./StyleBar";
 import ToolSegment from "./ToolSegment";
 import ZoomMenu from "./ZoomMenu";
 import Tip from "./Tip";
+import { Group, ICON, IconButton, Sep } from "./IconButton";
 import type { Zoom } from "./useZoom";
 
 type Props = {
+  name: string;
+  dims: string;
   tool: Tool;
   setTool: (t: Tool) => void;
   styleKind: Tool;
@@ -28,43 +32,67 @@ type Props = {
   copy: () => void;
 };
 
-const Sep = () => <span className="mx-1 h-4 w-px bg-[var(--separator)]" />;
+const MAC = navigator.userAgent.includes("Mac");
 
-function IconBtn({ icon: Icon, label, kbd, onClick, disabled, active }: { icon: LucideIcon; label: string; kbd?: string; onClick: () => void; disabled?: boolean; active?: boolean }) {
-  return (
-    <Tip label={label} kbd={kbd}>
-      <button className="btn btn-icon" aria-label={label} disabled={disabled} data-active={active} onClick={onClick}><Icon size={16} strokeWidth={1.9} /></button>
-    </Tip>
-  );
+/** Bar width in px; drives collapse (rare tools -> More, then labels, then title) so the row never wraps. */
+function useWidth() {
+  const ref = useRef<HTMLElement>(null);
+  const [w, setW] = useState(1400);
+  useEffect(() => {
+    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width));
+    ro.observe(ref.current!);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w] as const;
 }
 
-/** Unified toolbar: tools | contextual style | history, view and share actions. Style row wraps below on narrow windows. */
+/**
+ * Unified 52px toolbar that doubles as the title bar (Preview/Freeform style): tools | contextual style | spacer (+title) | actions.
+ * On macOS the window uses an overlay title bar, so 80px is reserved for the traffic lights. Double-click on empty
+ * bar space zooms the window natively via data-tauri-drag-region.
+ */
 export default function TopBar(p: Props) {
+  const [ref, w] = useWidth();
+  const compact = w < 1040, labels = w >= 900, title = w >= 1320; // measured bar width, never wrap
   return (
-    <header className="mat-thick relative z-20 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
-      style={{ boxShadow: "none", borderBottom: "0.5px solid var(--separator)" }}>
-      <div className="order-1">
-        <ToolSegment tool={p.tool} setTool={p.setTool} emoji={p.style.emoji} />
+    <header ref={ref} data-tauri-drag-region className="mat-thick relative z-20 flex h-[52px] shrink-0 items-center gap-1 pr-3"
+      style={{ paddingLeft: MAC ? 80 : 12, boxShadow: "none", borderBottom: "0.5px solid var(--separator)" }}>
+      <ToolSegment tool={p.tool} setTool={p.setTool} emoji={p.style.emoji} compact={compact} />
+      <Sep />
+      <StyleBar kind={p.styleKind} v={p.style} onChange={p.onStyle} />
+
+      <div data-tauri-drag-region className="flex min-w-0 flex-1 items-baseline justify-center gap-2 px-2">
+        {title && (
+          <>
+            <span className="t-headline pointer-events-none truncate">{p.name}</span>
+            <span className="t-caption tabular pointer-events-none shrink-0">{p.dims}</span>
+          </>
+        )}
       </div>
-      <div className="order-3 flex min-w-0 basis-full justify-center min-[1280px]:order-2 min-[1280px]:basis-auto min-[1280px]:flex-1">
-        <StyleBar kind={p.styleKind} v={p.style} onChange={p.onStyle} />
-      </div>
-      <div className="order-2 ml-auto flex items-center gap-0.5 min-[1280px]:order-3 min-[1280px]:ml-0">
-        <IconBtn icon={Undo2} label="Undo" kbd="⌘Z" onClick={p.undo} disabled={!p.canUndo} />
-        <IconBtn icon={Redo2} label="Redo" kbd="⇧⌘Z" onClick={p.redo} disabled={!p.canRedo} />
+
+      <Group>
+        <IconButton icon={Undo2} label="Undo" kbd="⌘Z" onClick={p.undo} disabled={!p.canUndo} />
+        <IconButton icon={Redo2} label="Redo" kbd="⇧⌘Z" onClick={p.redo} disabled={!p.canRedo} />
         <Sep />
-        <IconBtn icon={ImagePlus} label="Background" onClick={p.toggleBg} active={p.bgOn} />
-        <IconBtn icon={RotateCcw} label="Revert to Original" onClick={p.revert} disabled={!p.canRevert} />
+        <IconButton icon={ImagePlus} label="Background" onClick={p.toggleBg} active={p.bgOn} />
+        <IconButton icon={RotateCcw} label="Revert to Original" onClick={p.revert} disabled={!p.canRevert} />
         <ZoomMenu zoom={p.zoom} />
         <Sep />
-        <IconBtn icon={Pin} label="Pin to screen" onClick={p.pin} />
-        <IconBtn icon={UploadCloud} label="Upload" onClick={p.upload} />
-        <IconBtn icon={Download} label="Save As…" kbd="⇧⌘S" onClick={p.saveAs} />
+        <IconButton icon={Pin} label="Pin to screen" onClick={p.pin} />
+        <IconButton icon={UploadCloud} label="Upload" onClick={p.upload} />
+        <IconButton icon={Download} label="Save As…" kbd="⇧⌘S" onClick={p.saveAs} />
         <Sep />
-        <Tip label="Save" kbd="⌘S"><button className="btn btn-secondary" onClick={p.save}><Save size={15} />Save</button></Tip>
-        <span className="w-1" />
-        <Tip label="Copy" kbd="⌘C" align="end"><button className="btn btn-primary" onClick={p.copy}><Copy size={15} />Copy</button></Tip>
-      </div>
+        <Tip label="Save" kbd="⌘S">
+          <button className="btn !h-7 !rounded-[7px] !px-2.5" aria-label="Save" style={{ boxShadow: "0 0 0 0.5px var(--separator)" }} onClick={p.save}>
+            <Save {...ICON} size={15} />{labels && "Save"}
+          </button>
+        </Tip>
+        <Tip label="Copy" kbd="⌘C" align="end">
+          <button className="btn btn-primary !h-7 !rounded-[7px] !px-2.5" aria-label="Copy" onClick={p.copy}>
+            <Copy {...ICON} size={15} />{labels && "Copy"}
+          </button>
+        </Tip>
+      </Group>
     </header>
   );
 }

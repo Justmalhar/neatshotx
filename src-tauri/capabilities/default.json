@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "All NeatShotX windows",
-  "windows": ["*"],
+  "windows": [
+    "*"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-show",
@@ -25,6 +27,10 @@
     "opener:allow-reveal-item-in-dir",
     "drag:default",
     "autostart:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-set-min-size",
+    "core:app:allow-version",
+    "core:window:allow-internal-toggle-maximize"
   ]
 }
