@@ -10,15 +10,16 @@ import Handles from "../components/selector/Handles";
 import Loupe from "../components/selector/Loupe";
 import SelectionHud from "../components/selector/SelectionHud";
 
+// Short top hint, record/scroll only (CleanShot shows nothing for the instant-capture modes).
 const MODE_HINT: Record<string, string> = {
-  area: "Drag to capture · Space for window · Esc to cancel",
-  window: "Click a window · Space for area · Esc to cancel",
   record: "Drag the area to record · Esc to cancel",
   scroll: "Drag the scrollable area · Esc to cancel",
-  ocr: "Drag over text to copy it · Esc to cancel",
-  timer: "Drag the area · capture starts after the timer",
 };
-const ADJUST_HINT = "Drag to move · Shift locks aspect · Arrows nudge · Enter to confirm";
+const KEEP_EDITING = ["record", "scroll"]; // release keeps an editable selection + HUD; other modes confirm on release
+const FRAME = "0 0 0 1px rgba(255,255,255,.95), 0 0 0 2px rgba(0,0,0,.3)";
+const LBL_W = 112, LBL_H = 24;
+
+const snap = (v: number) => Math.round(v * (devicePixelRatio || 1)) / (devicePixelRatio || 1);
 
 const bounds = () => ({ w: innerWidth, h: innerHeight });
 const inHud = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.("[data-hud]");
@@ -36,9 +37,18 @@ export default function Selector() {
   const [windows, setWindows] = useState<WindowRect[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [last, setLast] = useState<Region | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [hint, setHint] = useState(true);
+  const hoverAtDown = useRef<WindowRect | null>(null);
   const done = useRef(false);
   const touched = useRef(false);
-  const { sel, setSel, drag, begin, apply, end, nudge, reapply } = useSelection(ratio);
+  const { sel, setSel, drag, begin, apply, end, nudge, reapply, holdSpace, active } = useSelection(ratio);
+  const src = convertFileSrc(String(monitor), "frozen");
+
+  useEffect(() => {
+    const t = setTimeout(() => setHint(false), 2500);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     api.listWindows(monitor).then(setWindows).catch(() => {});
@@ -59,20 +69,27 @@ export default function Selector() {
   const finishImage = (r: Rect, windowId?: number) => {
     if (done.current) return;
     done.current = true;
+    setClosing(true);
     api.finishSelection({ monitor, ...r }, windowId);
   };
   const confirm = () => sel && finishImage(toImageRect(sel, scale));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Shift") reapply(e.type === "keydown");
-      if (e.type !== "keydown") return;
-      if (e.key === "Escape") api.cancelSelection();
-      if (e.key === " " && ["area", "window"].includes(mode)) {
+      const down = e.type === "keydown";
+      if (e.key === "Shift" || e.key === "Alt") reapply({ shift: e.shiftKey, alt: e.altKey });
+      if (e.key === " ") {
         e.preventDefault();
-        if (!windowMode) setSel(null);
-        setWindowMode(!windowMode);
-      } else if (e.key === "Enter" && sel) {
+        if (active()) holdSpace(down); // mid-drag: move the selection
+        else if (down && !e.repeat && ["area", "window"].includes(mode)) {
+          if (!windowMode) setSel(null);
+          setWindowMode(!windowMode);
+        }
+        return;
+      }
+      if (!down) return;
+      if (e.key === "Escape") api.cancelSelection();
+      else if (e.key === "Enter" && sel) {
         e.preventDefault();
         confirm();
       } else if (sel && e.key.startsWith("Arrow")) {
@@ -92,32 +109,43 @@ export default function Selector() {
     return windows.find((w) => px >= w.x && py >= w.y && px <= w.x + w.w && py <= w.y + w.h) ?? null;
   })();
   const hl: Rect | null = hovered ? { x: hovered.x / scale, y: hovered.y / scale, w: hovered.w / scale, h: hovered.h / scale } : null;
-  const box = sel ?? hl;
 
   const pt = (e: React.PointerEvent | React.MouseEvent): Pt => ({ x: e.clientX, y: e.clientY });
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || inHud(e.target)) return;
     touched.current = true;
+    hoverAtDown.current = hovered; // `hovered` is null once the drag starts re-rendering
     e.currentTarget.setPointerCapture(e.pointerId); // keep tracking outside the window edge
     begin(pt(e), e.target as HTMLElement);
   };
   const onPointerMove = (e: React.PointerEvent) => {
     setCursor(pt(e));
     setOverHud(inHud(e.target));
-    apply(pt(e), e.shiftKey);
+    apply(pt(e), { shift: e.shiftKey, alt: e.altKey });
   };
   const onPointerUp = () => {
-    const { kind, tiny } = end();
-    if (kind === "draw" && tiny && hovered) {
-      finishImage({ x: hovered.x, y: hovered.y, w: hovered.w, h: hovered.h }, mode === "record" || mode === "scroll" ? undefined : hovered.id);
+    const { kind, tiny, rect } = end();
+    const h = hoverAtDown.current;
+    hoverAtDown.current = null;
+    if (kind === "draw" && tiny && h) {
+      finishImage({ x: h.x, y: h.y, w: h.w, h: h.h }, KEEP_EDITING.includes(mode) ? undefined : h.id);
+    } else if (kind === "draw" && rect && !KEEP_EDITING.includes(mode)) {
+      finishImage(toImageRect(rect, scale)); // CleanShot: release confirms
     }
   };
 
   const cursorStyle = drag?.kind === "resize" ? HANDLE_CURSOR[drag.handle!] : drag?.kind === "move" ? "grabbing" : "crosshair";
-  const showLoupe = !!(settings?.selector_show_magnifier && cursor && !overHud && drag?.kind !== "move" && drag?.kind !== "resize");
+  const showLoupe = !!(loaded && settings?.selector_show_magnifier && cursor && !overHud && drag?.kind !== "move" && drag?.kind !== "resize");
   const drawing = drag?.kind === "draw";
-  const tagTop = box ? (box.y > 34 ? box.y - 30 : box.y + box.h + 6) : 0;
+  const showDims = !!(sel && (drawing || drag?.kind === "resize") && cursor);
+  const tagTop = hl ? (hl.y > 34 ? hl.y - 30 : hl.y + hl.h + 6) : 0;
+  const flipX = !!cursor && cursor.x + 16 + LBL_W > innerWidth;
+  const lx = cursor ? Math.round(flipX ? cursor.x - 16 : cursor.x + 16) : 0;
+  const ly = cursor ? Math.round(cursor.y + 18 + LBL_H > innerHeight ? cursor.y - 18 - LBL_H : cursor.y + 18) : 0;
+  const frame = sel
+    ? { x: snap(sel.x), y: snap(sel.y), w: snap(sel.x + sel.w) - snap(sel.x), h: snap(sel.y + sel.h) - snap(sel.y) }
+    : null;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -134,7 +162,7 @@ export default function Selector() {
       >
         <img
           ref={imgRef}
-          src={convertFileSrc(String(monitor), "frozen")}
+          src={src}
           crossOrigin="anonymous"
           className="pointer-events-none absolute inset-0 h-full w-full"
           draggable={false}
@@ -145,41 +173,53 @@ export default function Selector() {
           }}
         />
 
-        {box ? (
+        {frame && (
           <div
-            className="absolute rounded-[1px]"
-            style={{
-              left: box.x, top: box.y, width: box.w, height: box.h,
-              pointerEvents: sel ? "auto" : "none",
-              boxShadow: "inset 0 0 0 1px #fff, 0 0 0 1px rgba(0,0,0,.35), 0 0 0 99999px rgba(0,0,0,.45)",
-            }}
+            className="absolute"
+            style={{ left: frame.x, top: frame.y, width: frame.w, height: frame.h, boxShadow: `${FRAME}, 0 0 0 99999px rgba(0,0,0,.5)` }}
           >
-            {sel && (
-              <>
-                <div data-role="move" className="absolute inset-0" style={{ cursor: drag ? undefined : "move" }} />
-                <Handles />
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="pointer-events-none absolute inset-0 bg-black/10" />
-        )}
-
-        {box && (drawing || hl) && (
-          <div className="mat-hud t-caption tabular pointer-events-none absolute rounded-md px-2 py-0.5 font-medium" style={{ left: box.x, top: tagTop, color: "#fff" }}>
-            {Math.round(box.w * scale)} × {Math.round(box.h * scale)}
-            {hl && hovered ? ` · ${hovered.app}` : ""}
+            <div data-role="move" className="absolute inset-0" style={{ cursor: drag ? undefined : "move" }} />
+            {!drawing && <Handles />}
           </div>
         )}
 
-        {cursor && !sel && !drag && (
+        {hl && (
+          <div
+            className="pointer-events-none absolute"
+            style={{ left: snap(hl.x), top: snap(hl.y), width: snap(hl.w), height: snap(hl.h), background: "rgba(10,132,255,.18)", boxShadow: "inset 0 0 0 2px #0A84FF" }}
+          />
+        )}
+        {hl && hovered && (
+          <div className="mat-hud t-caption tabular pointer-events-none absolute rounded-md px-2 py-0.5 font-medium" style={{ left: Math.round(hl.x), top: Math.round(tagTop), color: "#fff" }}>
+            {hovered.app} · {Math.round(hl.w * scale)} × {Math.round(hl.h * scale)}
+          </div>
+        )}
+
+        <AnimatePresence>
+          {showDims && sel && (
+            <div key="dims" className="pointer-events-none absolute left-0 top-0 z-20" style={{ transform: `translate3d(${lx}px,${ly}px,0) translateX(${flipX ? "-100%" : "0"})` }}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={spring.ui}
+                className="mat-hud t-caption tabular rounded-md px-2 py-1 font-medium"
+                style={{ color: "#fff", fontSize: 12, transformOrigin: flipX ? "right top" : "left top" }}
+              >
+                {Math.round(sel.w * scale)} × {Math.round(sel.h * scale)}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {cursor && !sel && (
           <>
-            <div className="pointer-events-none absolute top-0 h-full w-px bg-white/50 mix-blend-difference" style={{ left: cursor.x }} />
-            <div className="pointer-events-none absolute left-0 h-px w-full bg-white/50 mix-blend-difference" style={{ top: cursor.y }} />
+            <div className="pointer-events-none absolute left-0 top-0 h-full w-px bg-white mix-blend-difference" style={{ transform: `translate3d(${snap(cursor.x)}px,0,0)` }} />
+            <div className="pointer-events-none absolute left-0 top-0 h-px w-full bg-white mix-blend-difference" style={{ transform: `translate3d(0,${snap(cursor.y)}px,0)` }} />
           </>
         )}
 
-        {sel && !drawing && (
+        {sel && !drawing && !closing && (
           <SelectionHud
             rect={sel}
             scale={scale}
@@ -191,20 +231,20 @@ export default function Selector() {
           />
         )}
 
-        {showLoupe && cursor && <Loupe cursor={cursor} img={imgRef} scale={scale} />}
+        {showLoupe && cursor && <Loupe cursor={cursor} img={imgRef} src={src} scale={scale} />}
 
         <AnimatePresence>
-          {!drag && (
+          {hint && MODE_HINT[mode] && (
             <motion.div
-              key={sel ? "adjust" : "hint"}
-              initial={{ opacity: 0, y: 6 }}
+              key="hint"
+              initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
+              exit={{ opacity: 0, y: -6 }}
               transition={spring.ui}
-              className="mat-hud t-caption pointer-events-none absolute bottom-8 rounded-full px-4 py-2 font-medium"
+              className="mat-hud t-caption pointer-events-none absolute top-8 rounded-full px-4 py-2 font-medium"
               style={{ color: "#fff", x: "-50%", left: "50%" }}
             >
-              {sel ? ADJUST_HINT : windowMode && ["area", "window"].includes(mode) ? MODE_HINT.window : MODE_HINT[mode] ?? MODE_HINT.area}
+              {MODE_HINT[mode]}
             </motion.div>
           )}
         </AnimatePresence>

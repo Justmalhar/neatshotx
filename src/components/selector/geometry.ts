@@ -65,6 +65,28 @@ export function resizeRect(orig: Rect, handle: Handle, p: Pt, bounds: Size, rati
   return { x: cx - dx / 2, y: Math.min(ay, ay + sy * dy), w: dx, h: dy };
 }
 
+/**
+ * Like resizeRect but symmetric about the center of `orig` (Option/Alt): the dragged handle's distance from the
+ * center becomes the half-extent on that axis. Drawing = orig is the empty rect at the start point.
+ */
+export function resizeSymmetric(orig: Rect, handle: Handle, p: Pt, bounds: Size, ratio: number | null): Rect {
+  const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
+  const px = clamp(p.x, 0, bounds.w), py = clamp(p.y, 0, bounds.h);
+  const hx = handle.includes("w") || handle.includes("e"), hy = handle.includes("n") || handle.includes("s");
+  let hw = hx ? Math.abs(px - cx) : orig.w / 2, hh = hy ? Math.abs(py - cy) : orig.h / 2;
+  if (ratio) {
+    if (hx && hy) { if (hw / ratio > hh) hh = hw / ratio; else hw = hh * ratio; }
+    else if (hx) hh = hw / ratio;
+    else hw = hh * ratio;
+  }
+  const mw = Math.min(cx, bounds.w - cx), mh = Math.min(cy, bounds.h - cy);
+  if (ratio) {
+    const s = Math.min(1, hw > 0 ? mw / hw : 1, hh > 0 ? mh / hh : 1);
+    hw *= s; hh *= s;
+  } else { hw = Math.min(hw, mw); hh = Math.min(hh, mh); }
+  return { x: cx - hw, y: cy - hh, w: hw * 2, h: hh * 2 };
+}
+
 export function moveRect(orig: Rect, dx: number, dy: number, bounds: Size): Rect {
   return { ...orig, x: clamp(orig.x + dx, 0, bounds.w - orig.w), y: clamp(orig.y + dy, 0, bounds.h - orig.h) };
 }

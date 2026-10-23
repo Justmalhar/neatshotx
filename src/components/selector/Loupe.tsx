@@ -2,52 +2,72 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Pt } from "./geometry";
 
 const ZOOM = 8;
-const N = 15; // odd: the center source pixel lands exactly in the middle
-const SIZE = N * ZOOM;
-const PAD = 24;
-const LABEL_H = 30;
+const SIZE = 120; // multiple of ZOOM, so the grid lines up with image pixels
+const PAD = 20;
+const LABEL_H = 46;
 
 const hex = (d: Uint8ClampedArray) => "#" + [d[0], d[1], d[2]].map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase();
 
-/** Pixel magnifier + hex of the pixel under the cursor. Color is skipped if the canvas is tainted. */
-export default function Loupe({ cursor, img, scale }: { cursor: Pt; img: RefObject<HTMLImageElement | null>; scale: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
+const LINE = "rgba(255,255,255,.55)";
+const GRID = "rgba(255,255,255,.14)";
+
+/**
+ * Pixel magnifier. The zoomed view is a plain div (background-image of the frozen screenshot, pixelated):
+ * a displayed, readback canvas stops repainting in WKWebView. Color comes from a separate 1x1 offscreen canvas.
+ */
+export default function Loupe({ cursor, img, src, scale }: { cursor: Pt; img: RefObject<HTMLImageElement | null>; src: string; scale: number }) {
+  const probe = useRef<HTMLCanvasElement | null>(null);
   const [color, setColor] = useState<string | null>(null);
+  const im = img.current;
+  const nw = im?.naturalWidth || 1, nh = im?.naturalHeight || 1;
+  const px = Math.min(Math.max(Math.floor(cursor.x * scale), 0), nw - 1);
+  const py = Math.min(Math.max(Math.floor(cursor.y * scale), 0), nh - 1);
 
   useEffect(() => {
-    const c = ref.current, im = img.current;
-    if (!c || !im) return;
-    const ctx = c.getContext("2d", { willReadFrequently: true })!;
-    const px = Math.floor(cursor.x * scale), py = Math.floor(cursor.y * scale);
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, SIZE, SIZE);
-    ctx.drawImage(im, px - (N - 1) / 2, py - (N - 1) / 2, N, N, 0, 0, SIZE, SIZE);
+    if (!im) return;
     try {
-      setColor(hex(ctx.getImageData(SIZE / 2 - 1, SIZE / 2 - 1, 1, 1).data));
+      const c = (probe.current ??= document.createElement("canvas"));
+      c.width = c.height = 1;
+      const ctx = c.getContext("2d", { willReadFrequently: true })!;
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.drawImage(im, px, py, 1, 1, 0, 0, 1, 1);
+      setColor(hex(ctx.getImageData(0, 0, 1, 1).data));
     } catch {
-      setColor(null); // tainted
+      setColor(null); // tainted or not decoded
     }
-    ctx.strokeStyle = "rgba(255,255,255,.95)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(SIZE / 2 - ZOOM / 2 + 0.5, SIZE / 2 - ZOOM / 2 + 0.5, ZOOM - 1, ZOOM - 1);
-    ctx.strokeStyle = "rgba(0,0,0,.6)";
-    ctx.strokeRect(SIZE / 2 - ZOOM / 2 - 0.5, SIZE / 2 - ZOOM / 2 - 0.5, ZOOM + 1, ZOOM + 1);
-  }, [cursor, img, scale]);
+  }, [im, px, py]);
 
-  const x = cursor.x + PAD + SIZE > innerWidth ? cursor.x - PAD - SIZE : cursor.x + PAD;
-  const y = cursor.y + PAD + SIZE + LABEL_H > innerHeight ? cursor.y - PAD - SIZE - LABEL_H : cursor.y + PAD;
+  const x = Math.round(cursor.x + PAD + SIZE > innerWidth ? cursor.x - PAD - SIZE : cursor.x + PAD);
+  const y = Math.round(cursor.y + PAD + SIZE + LABEL_H > innerHeight ? cursor.y - PAD - SIZE - LABEL_H : cursor.y + PAD);
+  const c = SIZE / 2;
 
   return (
     <div className="pointer-events-none absolute left-0 top-0 z-30 flex flex-col items-center gap-1.5" style={{ width: SIZE, transform: `translate3d(${x}px,${y}px,0)` }}>
-      <div className="overflow-hidden rounded-full border-2 border-white/90" style={{ width: SIZE, height: SIZE, boxShadow: "0 8px 30px rgba(0,0,0,.4)" }}>
-        <canvas ref={ref} width={SIZE} height={SIZE} />
+      <div className="relative overflow-hidden rounded-full" style={{ width: SIZE, height: SIZE, background: "#111", boxShadow: "0 0 0 3px #fff, 0 0 0 4px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.4)" }}>
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url("${src}")`,
+            backgroundRepeat: "no-repeat",
+            backgroundSize: `${nw * ZOOM}px ${nh * ZOOM}px`,
+            backgroundPosition: `${c - (px + 0.5) * ZOOM}px ${c - (py + 0.5) * ZOOM}px`,
+            imageRendering: "pixelated",
+          }}
+        />
+        <div className="absolute inset-0" style={{ backgroundImage: `linear-gradient(to right, ${GRID} 1px, transparent 1px), linear-gradient(to bottom, ${GRID} 1px, transparent 1px)`, backgroundSize: `${ZOOM}px ${ZOOM}px` }} />
+        <div className="absolute top-0 h-full w-px" style={{ left: c - 0.5, background: LINE }} />
+        <div className="absolute left-0 h-px w-full" style={{ top: c - 0.5, background: LINE }} />
+        <div className="absolute" style={{ left: c - ZOOM / 2, top: c - ZOOM / 2, width: ZOOM, height: ZOOM, boxShadow: "inset 0 0 0 1px #fff, 0 0 0 1px rgba(0,0,0,.7)" }} />
       </div>
-      {color && (
-        <div className="mat-hud t-caption tabular flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ color: "#fff" }}>
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: color, boxShadow: "0 0 0 0.5px rgba(255,255,255,.5)" }} />
-          {color}
-        </div>
-      )}
+      <div className="mat-hud tabular flex flex-col items-center rounded-lg px-2.5 py-1 leading-tight" style={{ color: "#fff" }}>
+        <span className="tabular text-[11px] font-semibold text-white">x: {px}&nbsp;&nbsp;y: {py}</span>
+        {color && (
+          <span className="flex items-center gap-1 text-[10px] opacity-70">
+            <span className="h-2 w-2 rounded-full" style={{ background: color, boxShadow: "0 0 0 0.5px rgba(255,255,255,.5)" }} />
+            {color}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

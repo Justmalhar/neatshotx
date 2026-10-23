@@ -1,5 +1,5 @@
 // Run: bun src/components/selector/geometry.check.ts
-import { fitRatio, moveRect, resizeRect, toImageRect } from "./geometry";
+import { fitRatio, moveRect, resizeRect, resizeSymmetric, toImageRect } from "./geometry";
 
 const ok = (c: boolean, m: string) => { if (!c) throw new Error("FAIL " + m); };
 const B = { w: 1000, h: 600 };
@@ -21,4 +21,10 @@ r = fitRatio({ x: 0, y: 0, w: 400, h: 400 }, 16 / 9, B);
 ok(near(r.w / r.h, 16 / 9), "fit");
 const i = toImageRect({ x: 0.25, y: 0.25, w: 10.5, h: 10 }, 2);
 ok(i.x === 1 && i.w === 21, "image rect");
+r = resizeSymmetric({ x: 100, y: 100, w: 0, h: 0 }, "se", { x: 150, y: 130 }, B, null);
+ok(r.x === 50 && r.y === 70 && r.w === 100 && r.h === 60, "symmetric draw");
+r = resizeSymmetric({ x: 100, y: 100, w: 0, h: 0 }, "se", { x: 150, y: 130 }, B, 1);
+ok(r.x === 50 && r.y === 50 && r.w === 100 && r.h === 100, "symmetric ratio");
+r = resizeSymmetric({ x: 10, y: 10, w: 0, h: 0 }, "se", { x: 500, y: 500 }, B, null);
+ok(r.x === 0 && r.y === 0 && r.w === 20 && r.h === 20, "symmetric clamps");
 console.log("geometry ok");
