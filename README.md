@@ -16,7 +16,7 @@ Built with **Tauri 2 (Rust)** + **React/TypeScript**. Lives in the menu bar / sy
 ## Requirements
 
 - Rust (stable), [Bun](https://bun.sh)
-- Linux: `libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libxdo-dev libpipewire-0.3-dev` (Tauri + xcap prerequisites)
+- Linux: PipeWire ≥ 1.0 (Ubuntu 24.04+, Fedora 39+; required by the screen-capture backend), plus `libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libxdo-dev libpipewire-0.3-dev` (Tauri + xcap prerequisites)
 - macOS: grant **Screen Recording** (screen capture permission) and **Accessibility** (only for automatic scrolling) in System Settings → Privacy & Security
 
 ## Run
