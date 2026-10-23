@@ -43,3 +43,8 @@ opt-level = 1
 strip = true
 lto = true
 codegen-units = 1
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# tauri-plugin-deep-link 2.6.2 builds ini::ParseOption with only 2 fields; rust-ini 0.21.2+ added more
+# in a patch release, breaking the Linux build. Drop this pin once deep-link handles the new fields.
+rust-ini = "=0.21.1"
