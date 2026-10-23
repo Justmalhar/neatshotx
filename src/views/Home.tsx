@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check } from "lucide-react";
 import { param } from "../lib/api";
@@ -31,11 +30,6 @@ export default function Home() {
     window.addEventListener("keydown", key);
     return () => { un.then((f) => f()); window.removeEventListener("keydown", key); };
   }, []);
-
-  // History gets a roomier window.
-  useEffect(() => {
-    getCurrentWindow().setSize(tab === "history" ? new LogicalSize(980, 700) : new LogicalSize(760, 640)).catch(() => {});
-  }, [tab]);
 
   const body = !ctl ? null
     : tab === "history" ? <History {...ctl} />
