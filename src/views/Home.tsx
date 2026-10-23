@@ -44,7 +44,7 @@ export default function Home() {
       <Toolbar tab={tab} onTab={setTab} />
       <main className="relative min-h-0 flex-1 overflow-y-auto">
         <AnimatePresence mode="popLayout" initial={false}>
-          <motion.div key={tab} className={`mx-auto px-6 pb-10 pt-6 ${tab === "history" ? "max-w-[920px]" : "max-w-[560px]"}`}
+          <motion.div key={tab} className={`mx-auto px-5 pb-10 pt-5 ${tab === "history" ? "max-w-[920px]" : "max-w-[520px]"}`}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.08 } }}
             transition={reduce ? { duration: 0.1 } : spring.ui}>
             {body}

@@ -27,7 +27,7 @@ export function Select<T extends string | number>({ value, options, onChange, la
 /** Preferences form row: right-aligned label column, controls left. 8px between rows. */
 export function Row({ label, children }: { label?: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[180px_1fr] items-baseline gap-x-3 py-1">
+    <div className="grid grid-cols-[140px_1fr] items-baseline gap-x-3 py-1">
       <div className="t-body text-right">{label}</div>
       <div className="flex min-w-0 flex-col items-start gap-2">{children}</div>
     </div>
@@ -37,7 +37,7 @@ export function Row({ label, children }: { label?: string; children: ReactNode }
 /** A group of controls: same as Row, separated from the previous group by a hairline with 16px padding. */
 export function Section({ label, children }: { label?: string; children: ReactNode }) {
   return (
-    <section className="grid grid-cols-[180px_1fr] items-baseline gap-x-3 border-t border-[var(--separator)] py-4 first:border-t-0 first:pt-0">
+    <section className="grid grid-cols-[140px_1fr] items-baseline gap-x-3 border-t border-[var(--separator)] py-4 first:border-t-0 first:pt-0">
       <div className="t-body text-right">{label}</div>
       <div className="flex min-w-0 flex-col items-start gap-2">{children}</div>
     </section>

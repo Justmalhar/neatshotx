@@ -71,7 +71,7 @@ export default function History({ s, set }: PaneProps) {
       ) : groups.map((g) => (
         <section key={g.label} className="mb-6">
           <h2 className="t-headline mb-2">{g.label}</h2>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
             {g.items.map((it) => <Card key={it.path} it={it} rev={rev} onDeleted={refresh} />)}
           </div>
         </section>

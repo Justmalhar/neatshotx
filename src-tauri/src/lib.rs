@@ -85,7 +85,7 @@ fn enc(s: &str) -> String {
 }
 
 fn open_home(app: &AppHandle, tab: &str) -> Result<(), String> {
-    let w = windows::normal(app, "main", &format!("/home?tab={tab}"), "NeatShotX", 880.0, 660.0).map_err(|e| e.to_string())?;
+    let w = windows::normal(app, "main", &format!("/home?tab={tab}"), "NeatShotX", 600.0, 600.0).map_err(|e| e.to_string())?;
     let _ = w.emit("nav", tab);
     Ok(())
 }
