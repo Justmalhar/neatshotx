@@ -9,8 +9,8 @@ import Card, { CARD_H } from "../components/quick-access/Card";
 import StackHeader from "../components/quick-access/StackHeader";
 import { playShutter } from "../components/quick-access/shutter";
 
-const GAP = 10;
-const PAD = 14;
+const GAP = 8;
+const PAD = 10;
 const HEADER_H = 32;
 
 export default function QuickAccess() {
@@ -35,6 +35,17 @@ export default function QuickAccess() {
       un = [listen("qa-pending", pull), listen("capture-updated", () => setRev((r) => r + 1))];
     });
     return () => { un.forEach((p) => p.then((f) => f())); };
+  }, []);
+
+  // Hover driven by Rust's global cursor poll (works while NeatShotX isn't the active app).
+  const [pointerPath, setPointerPath] = useState<string | null>(null);
+  useEffect(() => {
+    const un = listen<[number, number] | null>("qa-pointer", (e) => {
+      const pt = e.payload;
+      const el = pt && document.elementFromPoint(pt[0], pt[1])?.closest<HTMLElement>("[data-qa-path]");
+      setPointerPath(el ? el.dataset.qaPath ?? null : null);
+    });
+    return () => { un.then((f) => f()); };
   }, []);
 
   const hadItems = useRef(false);
@@ -65,11 +76,11 @@ export default function QuickAccess() {
   const off = reduced ? {} : { x: dir * 300 };
 
   return (
-    <div className="flex h-full flex-col justify-end gap-2.5 px-3.5 py-3.5">
+    <div className="flex h-full flex-col justify-end gap-2 px-2.5 py-2.5">
       <AnimatePresence>
         {items.length >= 2 && <StackHeader onCloseAll={() => setItems([])} onSaveAll={saveAll} />}
       </AnimatePresence>
-      <div className="no-scrollbar -mx-3.5 flex min-h-0 flex-col gap-2.5 overflow-y-auto px-3.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="no-scrollbar -mx-2.5 flex min-h-0 flex-col gap-2 overflow-y-auto px-2.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <AnimatePresence initial={false} mode="popLayout">
           {items.map((p) => (
             <motion.div
@@ -89,6 +100,7 @@ export default function QuickAccess() {
                 closeAfterDrag={cfg.qa_close_after_drag}
                 closeAfterUpload={cfg.qa_close_after_upload}
                 autoSaved={isVideo(p) ? cfg.recording_save : cfg.save_after_capture}
+                pointerOver={pointerPath === p}
                 onClose={() => remove(p)}
                 onReplace={(np) => setItems((cur) => cur.map((c) => (c === p ? np : c)))}
               />

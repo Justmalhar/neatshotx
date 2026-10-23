@@ -3,7 +3,7 @@ import { animate, useMotionValue, type AnimationPlaybackControls } from "motion/
 import { spring } from "../../lib/motion";
 
 const HYSTERESIS = 8; // px before the gesture commits to swipe vs native drag-out
-const WIDTH = 256;
+const WIDTH = 212; // card width: 232px window minus 2×10px padding
 
 /** Apple momentum projection (decelerationRate 0.998). */
 export const project = (v: number) => ((v / 1000) * 0.998) / (1 - 0.998);

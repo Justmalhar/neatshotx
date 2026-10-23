@@ -21,6 +21,7 @@ pub fn overlay<'a>(app: &'a AppHandle, label: &str, route: &str) -> WebviewWindo
         .resizable(false)
         .shadow(false)
         .visible_on_all_workspaces(true)
+        .accept_first_mouse(true) // first click acts instead of only activating the app
 }
 
 /// Covers an entire monitor (physical coords), drawn above the macOS menu bar.

@@ -123,8 +123,32 @@ pub fn open_quick_access(app: &AppHandle, path: &str) {
         let _ = app.emit_to("quick-access", "qa-pending", ());
         return;
     }
-    let _ = windows::overlay(app, "quick-access", "/quick-access").inner_size(280.0, 200.0).focused(false).build();
+    let _ = windows::overlay(app, "quick-access", "/quick-access").inner_size(QA_W, 200.0).focused(false).build();
     let _ = qa_resize(app.clone(), 200.0);
+    watch_qa_pointer(app);
+}
+
+const QA_W: f64 = 232.0;
+
+/// macOS sends no mouse-move events to windows of an inactive app, so CSS :hover never fires on
+/// the overlay. Poll the global cursor and forward it (window-local, logical px); None = outside.
+fn watch_qa_pointer(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let mut last: Option<(i32, i32)> = None;
+        // ponytail: 25 Hz poll while the overlay lives; an NSTrackingArea would be event-driven.
+        while let Some(w) = app.get_webview_window("quick-access") {
+            let (Ok(c), Ok(p), Ok(sz), Ok(s)) = (app.cursor_position(), w.outer_position(), w.outer_size(), w.scale_factor()) else { break };
+            let (x, y) = (c.x - p.x as f64, c.y - p.y as f64);
+            let inside = x >= 0.0 && y >= 0.0 && x < sz.width as f64 && y < sz.height as f64;
+            let now = inside.then(|| ((x / s) as i32, (y / s) as i32));
+            if now != last {
+                let _ = app.emit_to("quick-access", "qa-pointer", now);
+                last = now;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(40));
+        }
+    });
 }
 
 #[tauri::command]
@@ -141,8 +165,8 @@ fn qa_resize(app: AppHandle, height: f64) -> Result<(), String> {
     let area = m.work_area(); // excludes Dock / taskbar
     let (ax, ay, ah) = (area.position.x as f64 / s, area.position.y as f64 / s, area.size.height as f64 / s);
     let h = height.min(ah - 32.0);
-    w.set_size(LogicalSize::new(280.0, h)).map_err(|e| e.to_string())?;
-    let x = if settings::get(&app).qa_position == "right" { ax + area.size.width as f64 / s - 280.0 - 16.0 } else { ax + 16.0 };
+    w.set_size(LogicalSize::new(QA_W, h)).map_err(|e| e.to_string())?;
+    let x = if settings::get(&app).qa_position == "right" { ax + area.size.width as f64 / s - QA_W - 16.0 } else { ax + 16.0 };
     w.set_position(LogicalPosition::new(x, ay + ah - h - 16.0))
         .map_err(|e| e.to_string())
 }
