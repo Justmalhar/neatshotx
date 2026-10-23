@@ -410,3 +410,14 @@ pub fn prune_history(app: &AppHandle) {
 pub fn last_region(app: AppHandle) -> Option<Region> {
     *state(&app).last_region.lock().unwrap()
 }
+
+/// Editable project files (.neatshot JSON) are plain text.
+#[tauri::command]
+pub async fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(path, contents).map_err(|e| e.to_string())
+}

@@ -239,6 +239,8 @@ pub fn run() {
             capture::copy_file,
             capture::read_file,
             capture::copy_png,
+            capture::read_text_file,
+            capture::write_text_file,
             capture::clear_history,
             capture::last_region,
             scroll::finish_scroll,
